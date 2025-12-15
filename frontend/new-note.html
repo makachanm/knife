@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Write a New Post - Knife</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container header-inner">
+            <a href="/" class="logo">Knife</a>
+            <nav class="top-nav">
+                <a href="/">Home</a>
+                <a href="/new-note" class="active">Write</a>
+                <a href="/profile">Profile</a>
+                <a href="/bookmarks">Bookmarks</a>
+                <a href="/profile-settings">Settings</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container layout">
+        <section class="content">
+            <div class="page-title">
+                <h1>Write a New Post</h1>
+            </div>
+
+            <div id="note-creation-app">
+                <form id="note-form" class="form">
+                    <textarea id="content" name="content" placeholder="What's on your mind?" required></textarea>
+                    <input type="text" id="cw" name="cw" placeholder="Content Warning (optional)">
+                    <label for="public_range">Visibility:</label>
+                    <select id="public_range" name="public_range">
+                        <option value="3" selected>Public</option>
+                        <option value="2">Unlisted</option>
+                        <option value="1">Followers Only</option>
+                        <option value="0">Private</option>
+                    </select>
+                    <button type="submit">Post</button>
+                </form>
+                <div id="form-error" class="error-message"></div>
+            </div>
+        </section>
+        </aside>
+    </main>
+
+    <script src="/static/new-note.js"></script>
+</body>
+</html>

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile - Knife</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container header-inner">
+            <a href="/" class="logo">Knife</a>
+            <nav class="top-nav">
+                <a href="/">Home</a>
+                <a href="/new-note">Write</a>
+                <a href="/profile" class="active">Profile</a>
+                <a href="/profile-settings">Settings</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container layout">
+        <section class="content">
+            <div class="page-title">
+                <h1>Your Profile</h1>
+            </div>
+
+            <div id="profile-app">
+                <div class="profile-header">
+                    <h2 id="profile-name-header">Your Name</h2>
+                    <p id="profile-finger">@yourhandle</p>
+                </div>
+                <div class="profile-info">
+                    <h3>About Me</h3>
+                    <p id="profile-bio">This is your bio. Share something about yourself.</p>
+                </div>
+                <a href="/profile-settings" class="button">Edit Profile</a>
+            </div>
+            <div id="profile-error" class="error-message"></div>
+        </section>
+    </main>
+
+    <script src="/static/profile.js"></script>
+</body>
+</html>

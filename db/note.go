@@ -1,0 +1,118 @@
+package db
+
+import (
+	"fmt"
+	"time"
+)
+
+type NotePublicRange int
+
+const (
+	NotePublicRangePrivate NotePublicRange = iota
+	NotePublicRangeFollowers
+	NotePublicRangeUnlisted
+	NotePublicRangePublic
+)
+
+type Note struct {
+	ID           int64           `db:"id" json:"id"`
+	URI          string          `db:"uri" json:"uri"`
+	Cw           string          `db:"cw" json:"cw,omitempty"`
+	Content      string          `db:"content" json:"content"`
+	Host         string          `db:"host" json:"host"`
+	AuthorName   string          `db:"author_name" json:"author_name"`
+	AuthorFinger string          `db:"author_finger" json:"author_finger"`
+	Medias       string          `db:"medias" json:"medias,omitempty"`
+	PublicRange  NotePublicRange `db:"public_range" json:"public_range"`
+	CreateTime   time.Time       `db:"create_time" json:"create_time"`
+}
+
+type NoteModel struct {
+	DB *DB
+}
+
+func NewNoteModel(db *DB) *NoteModel {
+	return &NoteModel{DB: db}
+}
+
+// CreateFederatedNote creates a note that already has a URI (e.g., from ActivityPub).
+func (m *NoteModel) CreateFederatedNote(note *Note) error {
+	query := `
+		INSERT INTO notes (uri, cw, content, host, author_name, medias, public_range, author_finger)
+		VALUES (:uri, :cw, :content, :host, :author_name, :medias, :public_range, :author_finger)
+	`
+
+	_, err := m.DB.NamedExec(query, note)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// CreateLocalNote creates a note originating from the local instance.
+// It inserts the note, gets the ID, and then constructs the URI.
+func (m *NoteModel) CreateLocalNote(note *Note) error {
+	tx, err := m.DB.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() // Rollback on error
+
+	// Insert the note without the URI
+	query := `
+		INSERT INTO notes (cw, content, host, author_name, medias, public_range, author_finger)
+		VALUES (:cw, :content, :host, :author_name, :medias, :public_range, :author_finger)
+	`
+	result, err := tx.NamedExec(query, note)
+	if err != nil {
+		return err
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return err
+	}
+	note.ID = id
+
+	// Generate the URI and update the note
+	// Note: The note.Host must be set by the caller (API layer)
+	note.URI = fmt.Sprintf("https://%s/notes/%d", note.Host, note.ID)
+	updateQuery := "UPDATE notes SET uri = ? WHERE id = ?"
+	if _, err := tx.Exec(updateQuery, note.URI, note.ID); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (m *NoteModel) Get(id int64) (*Note, error) {
+	var note Note
+	query := "SELECT * FROM notes WHERE id = ?"
+	err := m.DB.Get(&note, query, id)
+	return &note, err
+}
+
+// Update allows modifying a note's content. It also allows setting the URI.
+func (m *NoteModel) Update(note *Note) error {
+	query := `
+		UPDATE notes
+		SET uri = :uri, cw = :cw, content = :content, medias = :medias, public_range = :public_range
+		WHERE id = :id
+	`
+	_, err := m.DB.NamedExec(query, note)
+	return err
+}
+
+func (m *NoteModel) Delete(id int64) error {
+	query := "DELETE FROM notes WHERE id = ?"
+	_, err := m.DB.Exec(query, id)
+	return err
+}
+
+func (m *NoteModel) ListRecent() ([]Note, error) {
+	var notes []Note
+	query := "SELECT * FROM notes ORDER BY create_time DESC LIMIT 100"
+	err := m.DB.Select(&notes, query)
+	return notes, err
+}

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile Settings - Knife</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container header-inner">
+            <a href="/" class="logo">Knife</a>
+            <nav class="top-nav">
+                <a href="/">Home</a>
+                <a href="/new-note">Write</a>
+                <a href="/profile">Profile</a>
+                <a href="/profile-settings" class="active">Settings</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container layout">
+        <section class="content">
+            <div class="page-title">
+                <h1>Edit Your Profile</h1>
+            </div>
+
+            <div id="profile-settings-app">
+                <form id="profile-form" class="form">
+                    <label for="name">Name:</label>
+                    <input type="text" id="name" name="name" placeholder="Enter your name" required>
+
+                    <label for="bio">Bio:</label>
+                    <textarea id="bio" name="bio" placeholder="Write a short bio about yourself"></textarea>
+
+                    <button type="submit">Save Changes</button>
+                </form>
+                <div id="form-message" class="error-message"></div>
+            </div>
+        </section>
+
+    </main>
+
+    <script src="/static/profile-settings.js"></script>
+</body>
+</html>

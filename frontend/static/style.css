@@ -1,0 +1,154 @@
+/* Import Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700&display=swap');
+
+/* General Body Styles */
+body {
+    font-family: 'Source Sans Pro', sans-serif;
+    background-color: #f9f9f9;
+    color: #333;
+    line-height: 1.8;
+    margin: 0;
+    font-size: 16px;
+}
+
+/* Header Styles */
+.site-header {
+    background-color: #fff;
+    border-bottom: 1px solid #ddd;
+    padding: 10px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.site-header .logo {
+    font-size: 1.8em;
+    font-weight: bold;
+    color: #0073e6;
+    text-decoration: none;
+}
+
+.site-header nav a {
+    color: #555;
+    text-decoration: none;
+    padding: 10px 15px;
+    font-weight: 500;
+    transition: color 0.3s;
+}
+
+.site-header nav a:hover {
+    color: #0073e6;
+}
+
+/* Main Layout */
+.container.layout {
+    display: grid;
+    grid-template-columns: 3fr 1fr;
+    gap: 20px;
+    max-width: 1200px;
+    margin: 20px auto;
+    padding: 0 15px;
+}
+
+/* Content Section */
+.content {
+    background: #fff;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.page-title h1 {
+    font-size: 2.2em;
+    margin-bottom: 10px;
+}
+
+.page-title .lead {
+    font-size: 1.2em;
+    color: #666;
+}
+
+/* Sidebar */
+.sidebar {
+    background: #fff;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.sidebar .card {
+    margin-bottom: 20px;
+}
+
+.sidebar .card h3 {
+    font-size: 1.4em;
+    margin-bottom: 10px;
+}
+
+.sidebar .card .side-links a {
+    display: block;
+    color: #0073e6;
+    text-decoration: none;
+    margin-bottom: 5px;
+    transition: color 0.3s;
+}
+
+.sidebar .card .side-links a:hover {
+    color: #005bb5;
+}
+
+/* Form Styles */
+.form textarea,
+.form input,
+.form select {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 15px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 1em;
+}
+
+.form button {
+    background: #0073e6;
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1em;
+    transition: background 0.3s;
+}
+
+.form button:hover {
+    background: #005bb5;
+}
+
+/* Profile Page */
+.profile-header {
+    text-align: center;
+    padding-bottom: 25px;
+}
+
+.profile-picture {
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    margin-bottom: 20px;
+    border: 6px solid #fff;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    transition: transform 0.3s ease;
+}
+
+.profile-picture:hover {
+    transform: scale(1.05);
+}
+
+.profile-info {
+    text-align: center;
+    margin-top: 20px;
+}
