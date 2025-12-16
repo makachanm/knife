@@ -81,6 +81,10 @@ func (context *APIContext) runMiddlewars(allowed []string) bool {
 	return true
 }
 
+func (context *APIContext) GetCookie(name string) (*http.Cookie, error) {
+	return context.req.Cookie(name)
+}
+
 func (context *APIContext) GetPathParamValue(key string) string {
 	return context.req.PathValue(key)
 }
@@ -88,7 +92,6 @@ func (context *APIContext) GetPathParamValue(key string) string {
 func (context *APIContext) GetHost() string {
 	return context.req.Host
 }
-
 
 func (context *APIContext) GetContext(v any) error {
 	q := context.req.URL.Query()
@@ -162,6 +165,17 @@ func (context *APIContext) ReturnError(errortype string, errordescript string, r
 	}
 
 	return context.ReturnJSON(ax)
+}
+
+func (ctx *APIContext) SetCookie(name, value, path string, maxAge int64, httpOnly bool) {
+	http.SetCookie(ctx.res, &http.Cookie{
+		Name:     name,
+		Value:    value,
+		Path:     path,
+		MaxAge:   int(maxAge),
+		HttpOnly: httpOnly,
+		SameSite: http.SameSiteStrictMode, // 쿠키가 동일 사이트에서만 전송되도록 설정
+	})
 }
 
 type APIRouter struct {

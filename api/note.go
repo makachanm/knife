@@ -2,7 +2,6 @@ package api
 
 import (
 	"database/sql"
-	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -21,11 +20,10 @@ func NewNoteAPI(noteModel *db.NoteModel, profileModel *db.ProfileModel) *NoteAPI
 
 // RegisterHandlers registers the API handlers for notes.
 func (a *NoteAPI) RegisterHandlers(router *base.APIRouter) {
-	router.GET("notes", a.listNotes, []string{"all"})
-	router.POST("notes", a.createNote, []string{"all"})
-	router.GET("notes/{id}", a.getNote, []string{"all"})
-	router.PUT("notes/{id}", a.updateNote, []string{"all"})
-	router.DELETE("notes/{id}", a.deleteNote, []string{"all"})
+	router.GET("notes", a.listNotes, nil)
+	router.POST("notes", a.createNote, []string{"AuthMiddleware"})
+	router.GET("notes/{id}", a.getNote, nil)
+	router.DELETE("notes/{id}", a.deleteNote, []string{"AuthMiddleware"})
 }
 
 func (a *NoteAPI) listNotes(ctx base.APIContext) {
@@ -78,30 +76,6 @@ func (a *NoteAPI) getNote(ctx base.APIContext) {
 		}
 		return
 	}
-	ctx.ReturnJSON(note)
-}
-
-func (a *NoteAPI) updateNote(ctx base.APIContext) {
-	idStr := ctx.GetPathParamValue("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		ctx.ReturnError("badrequest", "Invalid note ID", http.StatusBadRequest)
-		return
-	}
-
-	var note db.Note
-	if err := json.Unmarshal(ctx.RawBody(), &note); err != nil {
-		ctx.ReturnError("badrequest", "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	note.ID = id
-
-	if err := a.noteModel.Update(&note); err != nil {
-		ctx.ReturnError("dberror", err.Error(), http.StatusInternalServerError)
-		return
-	}
-
 	ctx.ReturnJSON(note)
 }
 

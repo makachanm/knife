@@ -47,8 +47,9 @@ CREATE TABLE IF NOT EXISTS notes (
 );`
 
 const schemaProfiles = `
-CREATE TABLE IF NOT EXISTS profiles (
+CREATE TABLE IF NOT EXISTS profile (
     finger TEXT PRIMARY KEY,
+    password_hash TEXT NOT NULL,
     display_name TEXT NOT NULL,
     avatar_url TEXT NOT NULL,
     bio TEXT NOT NULL

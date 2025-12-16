@@ -38,11 +38,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const createTime = new Date(note.create_time).toLocaleString();
 
-            let publicRangeOptions = '';
-            for (const key in publicRanges) {
-                publicRangeOptions += `<option value="${key}" ${note.public_range == key ? 'selected' : ''}>${publicRanges[key]}</option>`;
-            }
-
             noteElement.innerHTML = `
                 <div class='note-header'>
                     <div>
@@ -54,9 +49,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class='note-content'>${escapeHTML(note.content)}</div>
                 <div class='note-meta'>
                     <span>Posted on ${createTime}</span>
+                    <br />
+                    <span class='public-range'>${publicRanges[note.public_range] || 'Unknown'}</span>
                 </div>
                 <div class='note-actions'>
-                    <select class='public-range-select'>${publicRangeOptions}</select>
                     <button class='bookmark-button' data-note-id='${note.id}'>Bookmark</button>
                     <button class='delete-button'>Delete</button>
                 </div>
@@ -77,15 +73,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const noteElement = e.target.closest('.note');
             const noteId = noteElement.dataset.noteId;
             bookmarkNote(noteId);
-        }
-    });
-
-    timeline.addEventListener('change', (e) => {
-        if (e.target.classList.contains('public-range-select')) {
-            const noteElement = e.target.closest('.note');
-            const noteId = noteElement.dataset.noteId;
-            const newRange = parseInt(e.target.value, 10);
-            updateNotePublicRange(noteId, newRange);
         }
     });
 
@@ -118,33 +105,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             alert(`Error bookmarking note: ${error.message}`);
             console.error('Failed to bookmark note:', error);
-        }
-    }
-
-    async function updateNotePublicRange(id, newRange) {
-        try {
-            const getResponse = await fetch(`/api/notes/${id}`);
-            if (!getResponse.ok) throw new Error('Could not fetch note to update.');
-            const note = await getResponse.json();
-
-            note.public_range = newRange;
-
-            const putResponse = await fetch(`/api/notes/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(note)
-            });
-
-            if (!putResponse.ok) {
-                const errorData = await putResponse.json();
-                throw new Error(errorData.description || 'Failed to update note');
-            }
-
-            fetchNotes();
-        } catch (error) {
-            alert(`Error updating note: ${error.message}`);
-            console.error('Failed to update note:', error);
-            fetchNotes();
         }
     }
 

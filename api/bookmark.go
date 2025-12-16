@@ -9,18 +9,20 @@ import (
 
 type BookmarkAPI struct {
 	BookmarkModel *db.BookmarkModel
+	NoteModel     *db.NoteModel // Assuming NoteModel is needed for fetching note details
 }
 
-func NewBookmarkAPI(bookmarkModel *db.BookmarkModel) *BookmarkAPI {
+func NewBookmarkAPI(bookmarkModel *db.BookmarkModel, noteModel *db.NoteModel) *BookmarkAPI {
 	return &BookmarkAPI{
 		BookmarkModel: bookmarkModel,
+		NoteModel:     noteModel,
 	}
 }
 
 func (a *BookmarkAPI) RegisterHandlers(router *base.APIRouter) {
-	router.POST("bookmarks", a.createBookmark, nil)
+	router.POST("bookmarks", a.createBookmark, []string{"AuthMiddleware"})
 	router.GET("bookmarks", a.listBookmarks, nil)
-	router.DELETE("bookmarks/{note_id}", a.deleteBookmark, nil)
+	router.DELETE("bookmarks/{note_id}", a.deleteBookmark, []string{"AuthMiddleware"})
 }
 
 func (a *BookmarkAPI) createBookmark(ctx base.APIContext) {
@@ -60,13 +62,30 @@ func (a *BookmarkAPI) createBookmark(ctx base.APIContext) {
 }
 
 func (a *BookmarkAPI) listBookmarks(ctx base.APIContext) {
-	bookmarks, err := a.BookmarkModel.List()
+	// Fetch all bookmarks for the single user
+	bookmarks, err := a.BookmarkModel.ListAll()
 	if err != nil {
 		ctx.ReturnError("server_error", err.Error(), 500)
 		return
 	}
 
-	ctx.ReturnJSON(bookmarks)
+	// Fetch note details for each bookmark
+	notes := make([]map[string]interface{}, 0)
+	for _, bookmark := range bookmarks {
+		note, err := a.NoteModel.Get(bookmark.NoteID)
+		if err != nil {
+			ctx.ReturnError("server_error", "Failed to fetch note details", 500)
+			return
+		}
+		notes = append(notes, map[string]interface{}{
+			"note_id": note.ID,
+			"content": note.Content,
+			"author":  note.AuthorName,
+			"created": note.CreateTime,
+		})
+	}
+
+	ctx.ReturnJSON(notes)
 }
 
 func (a *BookmarkAPI) deleteBookmark(ctx base.APIContext) {

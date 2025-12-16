@@ -19,8 +19,8 @@ func NewProfileAPI(profileModel *db.ProfileModel) *ProfileAPI {
 
 // RegisterHandlers registers the API handlers for profiles.
 func (a *ProfileAPI) RegisterHandlers(router *base.APIRouter) {
-	router.GET("profile", a.getProfile, []string{"all"})
-	router.PUT("profile", a.updateProfile, []string{"all"})
+	router.GET("profile", a.getProfile, nil)
+	router.PUT("profile", a.updateProfile, []string{"AuthMiddleware"})
 }
 
 func (a *ProfileAPI) getProfile(ctx base.APIContext) {
@@ -33,6 +33,9 @@ func (a *ProfileAPI) getProfile(ctx base.APIContext) {
 		}
 		return
 	}
+
+	profile.Finger = "@" + profile.Finger + "@" + ctx.GetHost()
+	profile.PasswordHash = "" // Hide sensitive information
 	ctx.ReturnJSON(profile)
 }
 

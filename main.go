@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"io"
 	"io/fs"
 	"log"
@@ -18,6 +20,9 @@ func main() {
 		return
 	}
 
+	// --- Generate or Load Secret Key ---
+	secretKey := getOrCreateSecretKey("secret.key")
+
 	// --- Database Initialization ---
 	dbconn, err := db.InitDB("knife.db")
 	if err != nil {
@@ -26,91 +31,44 @@ func main() {
 	defer dbconn.Close()
 
 	profileModel := db.NewProfileModel(dbconn)
-	profileAPI := api.NewProfileAPI(profileModel)
-
-	// --- API Model and Handler Setup ---
+	profileApi := api.NewProfileAPI(profileModel)
 	noteModel := db.NewNoteModel(dbconn)
 	noteAPI := api.NewNoteAPI(noteModel, profileModel)
-
 	bookmarkModel := db.NewBookmarkModel(dbconn)
-	bookmarkAPI := api.NewBookmarkAPI(bookmarkModel)
+	bookmarkApi := api.NewBookmarkAPI(bookmarkModel, noteModel)
+
+	// --- Authentication API ---
+	authAPI := api.NewAuthAPI(profileModel, secretKey)
+	authMiddleware := api.NewAuthMiddleware(authAPI)
 
 	// --- API Routing ---
-	// The API router will handle all routes under /api/
 	apiRouter := base.NewAPIRouter()
-	// No prefix is set here because the main mux will route /api/ to this router.
-	// The APIRouter's pathMaker will create paths like "GET /notes", not "GET /api/notes"
+	authAPI.RegisterHandlers(&apiRouter)
+	profileApi.RegisterHandlers(&apiRouter)
 	noteAPI.RegisterHandlers(&apiRouter)
-	profileAPI.RegisterHandlers(&apiRouter)
-	bookmarkAPI.RegisterHandlers(&apiRouter)
+	bookmarkApi.RegisterHandlers(&apiRouter)
+
+	// Apply authentication middleware to protected routes
+	apiRouter.RegisterMidddleware(authMiddleware)
 
 	// --- Main Server Routing ---
 	mainMux := http.NewServeMux()
-
-	// Route API calls to the API router
 	mainMux.Handle("/api/", http.StripPrefix("/api", apiRouter.GetMUX()))
 
-	// Create a http.FileServer to serve embedded files
-	// The http.Dir("frontend") part in the original code pointed to the filesystem.
-	// We need to strip "frontend" from the path when serving from embed.FS
-	// because web.Content embeds the "frontend" directory directly.
+	// Static file handling
 	staticFS, err := fs.Sub(Content, "frontend/static")
 	if err != nil {
 		panic(err)
 	}
-
 	mainMux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 
-	// Serve the main index.html for the root path
-	mainMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		file, err := Content.Open("frontend/index.html")
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		defer file.Close()
-		io.Copy(w, file)
-	})
-
-	mainMux.HandleFunc("/new-note", func(w http.ResponseWriter, r *http.Request) {
-		file, err := Content.Open("frontend/new-note.html")
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		defer file.Close()
-		io.Copy(w, file)
-	})
-
-	mainMux.HandleFunc("/profile", func(w http.ResponseWriter, r *http.Request) {
-		file, err := Content.Open("frontend/profile.html")
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		defer file.Close()
-		io.Copy(w, file)
-	})
-
-	mainMux.HandleFunc("/profile-settings", func(w http.ResponseWriter, r *http.Request) {
-		file, err := Content.Open("frontend/profile-settings.html")
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		defer file.Close()
-		io.Copy(w, file)
-	})
-
-	mainMux.HandleFunc("/bookmarks", func(w http.ResponseWriter, r *http.Request) {
-		file, err := Content.Open("frontend/bookmarks.html")
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		defer file.Close()
-		io.Copy(w, file)
-	})
+	// Serve HTML files
+	mainMux.HandleFunc("/", serveFile("frontend/index.html"))
+	mainMux.HandleFunc("/new-note", serveFile("frontend/new-note.html"))
+	mainMux.HandleFunc("/profile", serveFile("frontend/profile.html"))
+	mainMux.HandleFunc("/profile-settings", serveFile("frontend/profile-settings.html"))
+	mainMux.HandleFunc("/bookmarks", serveFile("frontend/bookmarks.html"))
+	mainMux.HandleFunc("/login", serveFile("frontend/login.html"))
 
 	// --- Start Server ---
 	log.Println("Server starting on :8080")
@@ -118,4 +76,43 @@ func main() {
 	if err := http.ListenAndServe(":8080", mainMux); err != nil {
 		log.Fatalf("could not start server: %v", err)
 	}
+}
+
+func serveFile(path string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		file, err := Content.Open(path)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer file.Close()
+		io.Copy(w, file)
+	}
+}
+
+// getOrCreateSecretKey generates or loads a secret key from a file.
+func getOrCreateSecretKey(filename string) string {
+	// Check if the key file exists
+	if _, err := os.Stat(filename); err == nil {
+		// Load the key from the file
+		key, err := os.ReadFile(filename)
+		if err != nil {
+			log.Fatalf("could not read secret key file: %v", err)
+		}
+		return string(key)
+	}
+
+	// Generate a new random key
+	key := make([]byte, 32) // 256-bit key
+	if _, err := rand.Read(key); err != nil {
+		log.Fatalf("could not generate secret key: %v", err)
+	}
+
+	// Save the key to the file
+	if err := os.WriteFile(filename, []byte(hex.EncodeToString(key)), 0600); err != nil {
+		log.Fatalf("could not write secret key to file: %v", err)
+	}
+
+	log.Println("Generated new secret key and saved to", filename)
+	return hex.EncodeToString(key)
 }
