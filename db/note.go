@@ -110,6 +110,12 @@ func (m *NoteModel) Delete(id int64) error {
 	return err
 }
 
+func (m *NoteModel) DeleteByURI(uri string) error {
+	query := "DELETE FROM notes WHERE uri = ?"
+	_, err := m.DB.Exec(query, uri)
+	return err
+}
+
 func (m *NoteModel) ListRecent() ([]Note, error) {
 	var notes []Note
 	query := "SELECT * FROM notes ORDER BY create_time DESC LIMIT 100"

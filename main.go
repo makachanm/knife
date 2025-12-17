@@ -36,6 +36,7 @@ func main() {
 	noteAPI := api.NewNoteAPI(noteModel, profileModel)
 	bookmarkModel := db.NewBookmarkModel(dbconn)
 	bookmarkApi := api.NewBookmarkAPI(bookmarkModel, noteModel)
+	activityPubApi := api.NewActivityPubAPI(noteModel, profileModel)
 
 	// --- Authentication API ---
 	authAPI := api.NewAuthAPI(profileModel, secretKey)
@@ -47,6 +48,7 @@ func main() {
 	profileApi.RegisterHandlers(&apiRouter)
 	noteAPI.RegisterHandlers(&apiRouter)
 	bookmarkApi.RegisterHandlers(&apiRouter)
+	activityPubApi.RegisterHandlers(&apiRouter)
 
 	// Apply authentication middleware to protected routes
 	apiRouter.RegisterMidddleware(authMiddleware)
@@ -54,6 +56,9 @@ func main() {
 	// --- Main Server Routing ---
 	mainMux := http.NewServeMux()
 	mainMux.Handle("/api/", http.StripPrefix("/api", apiRouter.GetMUX()))
+
+	// --- WebFinger ---
+	mainMux.HandleFunc("/.well-known/webfinger", activityPubApi.Webfinger)
 
 	// Static file handling
 	staticFS, err := fs.Sub(Content, "frontend/static")
