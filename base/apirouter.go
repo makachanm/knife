@@ -93,6 +93,14 @@ func (context *APIContext) GetHost() string {
 	return context.req.Host
 }
 
+func (context *APIContext) GetRequest() *http.Request {
+	return &context.req
+}
+
+func (context *APIContext) SetHeader(key, value string) {
+	context.res.Header().Set(key, value)
+}
+
 func (context *APIContext) GetContext(v any) error {
 	q := context.req.URL.Query()
 	entity := reflect.ValueOf(v).Elem()
@@ -115,9 +123,6 @@ func (context *APIContext) GetContext(v any) error {
 			context.ReturnError("servererror", "internal server deserialize error", http.StatusInternalServerError)
 			return err
 		}
-
-		fmt.Println(string(context.rawBodyData))
-		fmt.Println(v)
 	}
 
 	return nil

@@ -29,8 +29,19 @@ func InitDB(dataSourceName string) (*DB, error) {
 		return nil, err
 	}
 
+	if _, err := db.Exec(schemaFollowers); err != nil {
+		return nil, err
+	}
+
 	return &DB{db}, nil
 }
+
+const schemaFollowers = `
+CREATE TABLE IF NOT EXISTS followers (
+    actor_uri TEXT PRIMARY KEY,
+    inbox_uri TEXT NOT NULL,
+    followed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);`
 
 const schemaNotes = `
 CREATE TABLE IF NOT EXISTS notes (

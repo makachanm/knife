@@ -104,6 +104,12 @@ func (m *NoteModel) Update(note *Note) error {
 	return err
 }
 
+func (m *NoteModel) UpdateFederatedNote(note *Note) error {
+	query := "UPDATE notes SET content = ? WHERE uri = ?"
+	_, err := m.DB.Exec(query, note.Content, note.URI)
+	return err
+}
+
 func (m *NoteModel) Delete(id int64) error {
 	query := "DELETE FROM notes WHERE id = ?"
 	_, err := m.DB.Exec(query, id)

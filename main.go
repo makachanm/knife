@@ -8,7 +8,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
+	"knife/ap"
 	"knife/api"
 	"knife/base"
 	"knife/db"
@@ -33,10 +35,13 @@ func main() {
 	profileModel := db.NewProfileModel(dbconn)
 	profileApi := api.NewProfileAPI(profileModel)
 	noteModel := db.NewNoteModel(dbconn)
-	noteAPI := api.NewNoteAPI(noteModel, profileModel)
+	followerModel := db.NewFollowerModel(dbconn)
+	jobQueue := base.NewJobQueue(100)
+	jobQueue.Start()
+	noteAPI := api.NewNoteAPI(noteModel, profileModel, followerModel, jobQueue)
 	bookmarkModel := db.NewBookmarkModel(dbconn)
 	bookmarkApi := api.NewBookmarkAPI(bookmarkModel, noteModel)
-	activityPubApi := api.NewActivityPubAPI(noteModel, profileModel)
+	activityPubApi := ap.NewActivityPubAPI(noteModel, profileModel, followerModel)
 
 	// --- Authentication API ---
 	authAPI := api.NewAuthAPI(profileModel, secretKey)
@@ -48,7 +53,6 @@ func main() {
 	profileApi.RegisterHandlers(&apiRouter)
 	noteAPI.RegisterHandlers(&apiRouter)
 	bookmarkApi.RegisterHandlers(&apiRouter)
-	activityPubApi.RegisterHandlers(&apiRouter)
 
 	// Apply authentication middleware to protected routes
 	apiRouter.RegisterMidddleware(authMiddleware)
@@ -60,6 +64,25 @@ func main() {
 	// --- WebFinger ---
 	mainMux.HandleFunc("/.well-known/webfinger", activityPubApi.Webfinger)
 
+	// --- ActivityPub ---
+	mainMux.HandleFunc("/profile", func(w http.ResponseWriter, r *http.Request) {
+		acceptHeader := r.Header.Get("Accept")
+		if strings.Contains(acceptHeader, "application/activity+json") {
+			activityPubApi.Actor(w, r)
+		} else {
+			serveFile("frontend/profile.html")(w, r)
+		}
+	})
+	mainMux.HandleFunc("/inbox", activityPubApi.Inbox)
+	mainMux.HandleFunc("/notes/", func(w http.ResponseWriter, r *http.Request) {
+		acceptHeader := r.Header.Get("Accept")
+		if strings.Contains(acceptHeader, "application/activity+json") {
+			activityPubApi.Note(w, r)
+		} else {
+			serveFile("frontend/note.html")(w, r)
+		}
+	})
+
 	// Static file handling
 	staticFS, err := fs.Sub(Content, "frontend/static")
 	if err != nil {
@@ -70,7 +93,6 @@ func main() {
 	// Serve HTML files
 	mainMux.HandleFunc("/", serveFile("frontend/index.html"))
 	mainMux.HandleFunc("/new-note", serveFile("frontend/new-note.html"))
-	mainMux.HandleFunc("/profile", serveFile("frontend/profile.html"))
 	mainMux.HandleFunc("/profile-settings", serveFile("frontend/profile-settings.html"))
 	mainMux.HandleFunc("/bookmarks", serveFile("frontend/bookmarks.html"))
 	mainMux.HandleFunc("/login", serveFile("frontend/login.html"))

@@ -1,7 +1,10 @@
 package api
 
 import (
+	"bytes"
 	"database/sql"
+	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -10,12 +13,14 @@ import (
 )
 
 type NoteAPI struct {
-	noteModel    *db.NoteModel
-	profileModel *db.ProfileModel
+	noteModel     *db.NoteModel
+	profileModel  *db.ProfileModel
+	followerModel *db.FollowerModel
+	jobQueue      *base.JobQueue
 }
 
-func NewNoteAPI(noteModel *db.NoteModel, profileModel *db.ProfileModel) *NoteAPI {
-	return &NoteAPI{noteModel: noteModel, profileModel: profileModel}
+func NewNoteAPI(noteModel *db.NoteModel, profileModel *db.ProfileModel, followerModel *db.FollowerModel, jobQueue *base.JobQueue) *NoteAPI {
+	return &NoteAPI{noteModel: noteModel, profileModel: profileModel, followerModel: followerModel, jobQueue: jobQueue}
 }
 
 // RegisterHandlers registers the API handlers for notes.
@@ -56,6 +61,67 @@ func (a *NoteAPI) createNote(ctx base.APIContext) {
 		return
 	}
 
+	// Fan-out to followers
+	followers, err := a.followerModel.ListFollowers()
+	if err != nil {
+		log.Printf("failed to list followers: %v", err)
+		ctx.RawRetrun([]byte(""), http.StatusCreated)
+		return
+	}
+
+	actorURI := "https://" + note.Host + "/profile"
+	apNote := map[string]interface{}{
+		"@context":     "https://www.w3.org/ns/activitystreams",
+		"id":           note.URI,
+		"type":         "Note",
+		"published":    note.CreateTime.Format("2006-01-02T15:04:05Z"),
+		"attributedTo": actorURI,
+		"content":      note.Content,
+		"to":           []string{"https://www.w3.org/ns/activitystreams#Public"},
+	}
+
+	activity := map[string]interface{}{
+		"@context": "https://www.w3.org/ns/activitystreams",
+		"type":     "Create",
+		"actor":    actorURI,
+		"object":   apNote,
+	}
+	activityBytes, err := json.Marshal(activity)
+	if err != nil {
+		log.Printf("failed to marshal activity: %v", err)
+		ctx.RawRetrun([]byte(""), http.StatusCreated)
+		return
+	}
+
+	for _, follower := range followers {
+		follower := follower // Create a new variable for the closure
+		job := func() {
+			req, err := http.NewRequest("POST", follower.InboxURI, bytes.NewBuffer(activityBytes))
+			if err != nil {
+				log.Printf("failed to create request for follower %s: %v", follower.ActorURI, err)
+				return
+			}
+			req.Header.Set("Content-Type", "application/activity+json")
+
+			// TODO: Add HTTP Signature
+
+			client := &http.Client{}
+			resp, err := client.Do(req)
+			if err != nil {
+				log.Printf("failed to send note to follower %s: %v", follower.ActorURI, err)
+				return
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+				log.Printf("follower %s returned status %d", follower.ActorURI, resp.StatusCode)
+			} else {
+				log.Printf("Successfully sent note to follower %s", follower.ActorURI)
+			}
+		}
+		a.jobQueue.Enqueue(job)
+	}
+
 	ctx.RawRetrun([]byte(""), http.StatusCreated)
 }
 
@@ -76,6 +142,7 @@ func (a *NoteAPI) getNote(ctx base.APIContext) {
 		}
 		return
 	}
+
 	ctx.ReturnJSON(note)
 }
 
