@@ -15,7 +15,7 @@ func NewFollowerModel(db *DB) *FollowerModel {
 }
 
 func (m *FollowerModel) AddFollower(actorURI, inboxURI string) error {
-	_, err := m.db.Exec("INSERT INTO followers (actor_uri, inbox_uri) VALUES (?, ?)", actorURI, inboxURI)
+	_, err := m.db.Exec("INSERT OR IGNORE INTO followers (actor_uri, inbox_uri) VALUES (?, ?)", actorURI, inboxURI)
 	return err
 }
 

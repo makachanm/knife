@@ -1,9 +1,11 @@
 package ap
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -90,6 +92,36 @@ func (a *ActivityPubAPI) Actor(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(actor)
 }
 
+func (a *ActivityPubAPI) sendActivity(inbox string, activity interface{}) error {
+	activityJSON, err := json.Marshal(activity)
+	if err != nil {
+		return fmt.Errorf("failed to marshal activity: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", inbox, bytes.NewBuffer(activityJSON))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/activity+json")
+
+	// TODO: Sign the request
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send activity: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("activity send failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	log.Printf("Successfully sent activity to %s", inbox)
+	return nil
+}
+
 // Inbox handles incoming ActivityPub POST requests.
 func (a *ActivityPubAPI) Inbox(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -98,40 +130,102 @@ func (a *ActivityPubAPI) Inbox(w http.ResponseWriter, r *http.Request) {
 	}
 	data, err := io.ReadAll(r.Body)
 	if err != nil {
+		log.Printf("Inbox: failed to read request body: %v", err)
 		http.Error(w, "failed to read request body", http.StatusInternalServerError)
 		return
 	}
+	log.Printf("Inbox: received body: %s", data)
 
 	item, err := activitypub.UnmarshalJSON(data)
 	if err != nil {
+		log.Printf("Inbox: Invalid ActivityPub JSON: %v", err)
 		http.Error(w, "Invalid ActivityPub JSON", http.StatusBadRequest)
 		return
 	}
 
-	activitypub.OnActivity(item, func(act *activitypub.Activity) error {
+	err = activitypub.OnActivity(item, func(act *activitypub.Activity) error {
+		log.Printf("Inbox: processing activity of type %s", act.GetType())
 		switch act.GetType() {
 		case activitypub.FollowType:
 			var actorURI, inboxURI string
-			actor, err := activitypub.ToActor(act.Actor)
+			var actor *activitypub.Actor
+			var err error
+
+			actor, err = activitypub.ToActor(act.Actor)
 			if err != nil {
-				return err
+				// It's probably an IRI, let's fetch it
+				if iri := act.Actor.GetLink(); iri != "" {
+					log.Printf("Inbox: fetching actor from IRI %s", iri)
+					actor, err = fetchActor(iri.String())
+					if err != nil {
+						return fmt.Errorf("failed to fetch actor from IRI: %w", err)
+					}
+				} else {
+					return fmt.Errorf("could not resolve actor from Follow activity")
+				}
 			}
+
 			actorURI = actor.GetID().String()
 			inboxURI = string(actor.Inbox.GetLink())
-			fmt.Println("Actor URI:", actorURI)
-			fmt.Println("Inbox URI:", inboxURI)
+
 			if actorURI != "" && inboxURI != "" {
-				return a.followerModel.AddFollower(actorURI, inboxURI)
+				log.Printf("Inbox: Adding follower %s", actorURI)
+				err := a.followerModel.AddFollower(actorURI, inboxURI)
+				if err != nil {
+					return err
+				}
+
+				// Send Accept activity
+				_, err = a.profileModel.Get()
+				if err != nil {
+					log.Printf("Error getting profile for sending Accept: %v", err)
+					return nil // Don't block the rest of the processing
+				}
+
+				host := r.Host // Assuming we can get host from the request
+				myActorIRI := "https://" + host + "/profile"
+
+				accept := activitypub.Accept{
+					Type:   activitypub.AcceptType,
+					Actor:  activitypub.IRI(myActorIRI),
+					Object: act,
+				}
+
+				go func() {
+					log.Printf("Sending Accept for Follow to %s", inboxURI)
+					err := a.sendActivity(inboxURI, accept)
+					if err != nil {
+						log.Printf("Error sending Accept activity: %v", err)
+					}
+				}()
+
+				return nil
 			}
+			return fmt.Errorf("could not determine actor URI or inbox URI from Follow activity")
 		case activitypub.UndoType:
 			activitypub.OnObject(act.Object, func(object *activitypub.Object) error {
 				if object.GetType() == activitypub.FollowType {
 					var actorURI string
-					activitypub.OnObject(act.Actor, func(actor *activitypub.Object) error {
-						actorURI = actor.GetID().String()
-						return nil
-					})
+					var actor *activitypub.Actor
+					var err error
+
+					actor, err = activitypub.ToActor(act.Actor)
+					if err != nil {
+						// It's probably an IRI, let's fetch it
+						if iri := act.Actor.GetLink(); iri != "" {
+							log.Printf("Inbox: fetching actor from IRI %s", iri)
+							actor, err = fetchActor(iri.String())
+							if err != nil {
+								return fmt.Errorf("failed to fetch actor from IRI: %w", err)
+							}
+						} else {
+							return fmt.Errorf("could not resolve actor from Follow activity")
+						}
+					}
+
+					actorURI = actor.GetID().String()
 					if actorURI != "" {
+						log.Printf("Inbox: Removing follower %s", actorURI)
 						return a.followerModel.RemoveFollower(actorURI)
 					}
 				}
@@ -151,6 +245,7 @@ func (a *ActivityPubAPI) Inbox(w http.ResponseWriter, r *http.Request) {
 				if obj.GetType() != activitypub.NoteType {
 					return nil
 				}
+				log.Printf("Inbox: Creating federated note from %s", obj.GetID())
 				note := &db.Note{
 					URI:          obj.GetID().String(),
 					Content:      obj.Content.First().String(),
@@ -166,6 +261,7 @@ func (a *ActivityPubAPI) Inbox(w http.ResponseWriter, r *http.Request) {
 				if obj.GetType() != activitypub.NoteType {
 					return nil
 				}
+				log.Printf("Inbox: Updating federated note %s", obj.GetID())
 				note := &db.Note{
 					URI:     obj.GetID().String(),
 					Content: obj.Content.First().String(),
@@ -174,11 +270,16 @@ func (a *ActivityPubAPI) Inbox(w http.ResponseWriter, r *http.Request) {
 			})
 		case activitypub.DeleteType:
 			activitypub.OnObject(act.Object, func(obj *activitypub.Object) error {
+				log.Printf("Inbox: Deleting federated object %s", obj.GetID())
 				return a.noteModel.DeleteByURI(obj.GetID().String())
 			})
 		}
 		return nil
 	})
+	if err != nil {
+		log.Printf("Inbox: error processing activity: %v", err)
+		// Not returning http error because we don't want to expose internal errors
+	}
 
 	w.WriteHeader(http.StatusOK)
 }
@@ -215,4 +316,39 @@ func (a *ActivityPubAPI) Note(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/activity+json; charset=utf-8")
 	json.NewEncoder(w).Encode(apNote)
+}
+
+func fetchActor(actorIRI string) (*activitypub.Actor, error) {
+	req, err := http.NewRequest("GET", actorIRI, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/activity+json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("failed to fetch actor: status %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	item, err := activitypub.UnmarshalJSON(body)
+	if err != nil {
+		return nil, err
+	}
+
+	actor, err := activitypub.ToActor(item)
+	if err != nil {
+		return nil, err
+	}
+	return actor, nil
 }
