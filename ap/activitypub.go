@@ -7,10 +7,13 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
+	// For knife.Version
 	"knife/db"
+	"knife/etc"
 
 	"github.com/go-ap/activitypub"
 )
@@ -90,6 +93,39 @@ func (a *ActivityPubAPI) Actor(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/activity+json; charset=utf-8")
 	json.NewEncoder(w).Encode(actor)
+}
+
+// NodeInfoHandler handles /.well-known/nodeinfo requests
+func (a *ActivityPubAPI) NodeInfoHandler(w http.ResponseWriter, r *http.Request) {
+	nodeInfo := NodeInfo{
+		Version: "2.1", // Currently preferred NodeInfo version for ActivityPub
+		Software: NodeInfoSoftware{
+			Name:       "knife",
+			Version:    etc.Version,                          // Using version from main package
+			Homepage:   "https://github.com/makachanm/knife", // Placeholder, ideally from config
+			Repository: "https://github.com/makachanm/knife", // Placeholder, ideally from config
+		},
+		Protocols: []string{"activitypub"},
+		Services: NodeInfoServices{
+			Outbound: []string{}, // Customize if your instance supports outbound federation for other services
+			Inbound:  []string{}, // Customize if your instance supports inbound federation from other services
+		},
+		OpenRegistrations: false, // As per single-user application
+		Usage: NodeInfoUsage{
+			Users: NodeInfoUsageUsers{
+				Total:          1, // Single-user application
+				ActiveHalfyear: 1, // Single-user application
+				ActiveMonth:    1, // Single-user application
+			},
+		},
+		Metadata: map[string]interface{}{
+			"nodeName":        "knife instance",                                  // Customizable
+			"nodeDescription": "A personal ActivityPub server powered by knife.", // Customizable
+		},
+	}
+
+	w.Header().Set("Content-Type", "application/json; profile=\"http://nodeinfo.diaspora.software/ns/schema/2.1#\"")
+	json.NewEncoder(w).Encode(nodeInfo)
 }
 
 func (a *ActivityPubAPI) sendActivity(inbox string, activity interface{}) error {
@@ -182,8 +218,8 @@ func (a *ActivityPubAPI) Inbox(w http.ResponseWriter, r *http.Request) {
 					return nil // Don't block the rest of the processing
 				}
 
-				host := r.Host // Assuming we can get host from the request
-				myActorIRI := "https://" + host + "/profile"
+				//host := r.Host // Assuming we can get host from the request
+				myActorIRI := "https://" + r.Host + "/profile"
 
 				accept := activitypub.Accept{
 					Type:   activitypub.AcceptType,
@@ -233,13 +269,27 @@ func (a *ActivityPubAPI) Inbox(w http.ResponseWriter, r *http.Request) {
 			})
 		case activitypub.CreateType:
 			var authorName, authorFinger, authorHost string
+			var actor *activitypub.Actor
+			var err error
 
-			activitypub.OnObject(act.Actor, func(author *activitypub.Object) error {
-				authorName = author.Name.String()
-				authorFinger = author.GetID().String()
-				authorHost = author.GetID().GetLink().String()
-				return nil
-			})
+			actor, err = activitypub.ToActor(act.Actor)
+			if err != nil {
+				// It's probably an IRI, let's fetch it
+				if iri := act.Actor.GetLink(); iri != "" {
+					log.Printf("Inbox: fetching actor from IRI %s", iri)
+					actor, err = fetchActor(iri.String())
+					if err != nil {
+						return fmt.Errorf("failed to fetch actor from IRI: %w", err)
+					}
+				} else {
+					return fmt.Errorf("could not resolve actor from Follow activity")
+				}
+			}
+
+			authorName = actor.Name.String()
+			authorFinger = actor.PreferredUsername.String()
+			url, _ := url.Parse(actor.URL.GetLink().String())
+			authorHost = url.Host
 
 			activitypub.OnObject(act.Object, func(obj *activitypub.Object) error {
 				if obj.GetType() != activitypub.NoteType {
@@ -305,6 +355,26 @@ func (a *ActivityPubAPI) Note(w http.ResponseWriter, r *http.Request) {
 	}
 
 	actorURI := "https://" + r.Host + "/profile" // Assuming single user profile URI
+
+	// Determine visibility based on PublicRange
+	to := make([]string, 0)
+	cc := make([]string, 0)
+
+	switch note.PublicRange {
+	case db.NotePublicRangePublic:
+		to = append(to, "https://www.w3.org/ns/activitystreams#Public")
+	case db.NotePublicRangeUnlisted:
+		cc = append(cc, "https://www.w3.org/ns/activitystreams#Public") // Unlisted implies visible to public but not in feeds
+	case db.NotePublicRangeFollowers:
+		to = append(to, actorURI+"/followers") // Assuming followers endpoint
+	case db.NotePublicRangePrivate:
+		// For private notes, it might be an empty 'to' or specific recipients.
+		// For now, let's not expose private notes via AP publicly unless explicitly addressed to someone.
+		// If it's private, we'll assume it's not meant for public AP consumption.
+		http.Error(w, "Private note not found or accessible publicly", http.StatusNotFound)
+		return
+	}
+
 	apNote := map[string]interface{}{
 		"@context":     "https://www.w3.org/ns/activitystreams",
 		"id":           note.URI,
@@ -312,7 +382,8 @@ func (a *ActivityPubAPI) Note(w http.ResponseWriter, r *http.Request) {
 		"published":    note.CreateTime.Format("2006-01-02T15:04:05Z"),
 		"attributedTo": actorURI,
 		"content":      note.Content,
-		"to":           []string{"https://www.w3.org/ns/activitystreams#Public"},
+		"to":           to,
+		"cc":           cc,
 	}
 	w.Header().Set("Content-Type", "application/activity+json; charset=utf-8")
 	json.NewEncoder(w).Encode(apNote)

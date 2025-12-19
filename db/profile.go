@@ -43,3 +43,10 @@ func (m *ProfileModel) Update(profile *Profile) error {
 	_, err := m.DB.NamedExec(query, profile)
 	return err
 }
+
+func (m *ProfileModel) CountProfiles() (int, error) {
+	var count int
+	query := `SELECT COUNT(*) FROM profile`
+	err := m.DB.Get(&count, query)
+	return count, err
+}
