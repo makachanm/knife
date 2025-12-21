@@ -33,8 +33,21 @@ func InitDB(dataSourceName string) (*DB, error) {
 		return nil, err
 	}
 
+	if _, err := db.Exec(schemaHTTPSigs); err != nil {
+		return nil, err
+	}
+
 	return &DB{db}, nil
 }
+
+const schemaHTTPSigs = `
+CREATE TABLE IF NOT EXISTS httpsigs (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	actor TEXT NOT NULL UNIQUE,
+	public_key TEXT NOT NULL,
+	private_key TEXT NOT NULL
+);
+`
 
 const schemaFollowers = `
 CREATE TABLE IF NOT EXISTS followers (

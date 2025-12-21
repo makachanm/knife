@@ -6,8 +6,15 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"net/url"
 	"strconv"
+	"time"
 
+	"crypto/x509"
+	"encoding/pem"
+
+	"github.com/go-fed/httpsig"
+	"github.com/gomarkdown/markdown"
 	"knife/base"
 	"knife/db"
 )
@@ -16,11 +23,12 @@ type NoteAPI struct {
 	noteModel     *db.NoteModel
 	profileModel  *db.ProfileModel
 	followerModel *db.FollowerModel
+	httpsigModel  *db.HTTPSigModel
 	jobQueue      *base.JobQueue
 }
 
-func NewNoteAPI(noteModel *db.NoteModel, profileModel *db.ProfileModel, followerModel *db.FollowerModel, jobQueue *base.JobQueue) *NoteAPI {
-	return &NoteAPI{noteModel: noteModel, profileModel: profileModel, followerModel: followerModel, jobQueue: jobQueue}
+func NewNoteAPI(noteModel *db.NoteModel, profileModel *db.ProfileModel, followerModel *db.FollowerModel, httpsigModel *db.HTTPSigModel, jobQueue *base.JobQueue) *NoteAPI {
+	return &NoteAPI{noteModel: noteModel, profileModel: profileModel, followerModel: followerModel, httpsigModel: httpsigModel, jobQueue: jobQueue}
 }
 
 // RegisterHandlers registers the API handlers for notes.
@@ -56,6 +64,7 @@ func (a *NoteAPI) createNote(ctx base.APIContext) {
 	note.Host = ctx.GetHost()
 	note.AuthorName = profile.DisplayName
 	note.AuthorFinger = profile.Finger
+	note.Content = string(markdown.ToHTML([]byte(note.Content), nil, nil))
 	if err := a.noteModel.CreateLocalNote(&note); err != nil {
 		ctx.ReturnError("dberror", err.Error(), http.StatusInternalServerError)
 		return
@@ -102,8 +111,45 @@ func (a *NoteAPI) createNote(ctx base.APIContext) {
 				return
 			}
 			req.Header.Set("Content-Type", "application/activity+json")
+			req.Header.Set("Date", time.Now().UTC().Format(http.TimeFormat))
+			inboxURL, err := url.Parse(follower.InboxURI)
+			if err != nil {
+				log.Printf("failed to parse inbox url for follower %s: %v", follower.ActorURI, err)
+				return
+			}
+			req.Header.Set("Host", inboxURL.Host)
 
-			// TODO: Add HTTP Signature
+			sig, err := a.httpsigModel.GetByActor(actorURI)
+			if err != nil {
+				log.Printf("failed to get httpsig for %s: %v", actorURI, err)
+				return
+			}
+
+			block, _ := pem.Decode([]byte(sig.PrivateKey))
+			if block == nil {
+				log.Printf("failed to decode private key for %s", actorURI)
+				return
+			}
+			privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+			if err != nil {
+				log.Printf("failed to parse private key for %s: %v", actorURI, err)
+				return
+			}
+
+			// Sign the request
+			keyID := actorURI + "#main-key"
+			prefs := []httpsig.Algorithm{httpsig.RSA_SHA256}
+			digestAlgo := httpsig.DigestSha256
+			headersToSign := []string{httpsig.RequestTarget, "host", "date", "digest"}
+			signer, _, err := httpsig.NewSigner(prefs, digestAlgo, headersToSign, httpsig.Signature, 65535)
+			if err != nil {
+				log.Printf("failed to create signer for %s: %v", actorURI, err)
+				return
+			}
+			if err := signer.SignRequest(privateKey, keyID, req, activityBytes); err != nil {
+				log.Printf("failed to sign request for %s: %v", follower.ActorURI, err)
+				return
+			}
 
 			client := &http.Client{}
 			resp, err := client.Do(req)
@@ -152,6 +198,100 @@ func (a *NoteAPI) deleteNote(ctx base.APIContext) {
 	if err != nil {
 		ctx.ReturnError("badrequest", "Invalid note ID", http.StatusBadRequest)
 		return
+	}
+
+	note, err := a.noteModel.Get(id)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			ctx.ReturnError("notfound", "Note not found", http.StatusNotFound)
+		} else {
+			ctx.ReturnError("dberror", err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	actorURI := "https://" + note.Host + "/profile"
+	activity := map[string]interface{}{
+		"@context": "https://www.w3.org/ns/activitystreams",
+		"type":     "Delete",
+		"actor":    actorURI,
+		"object":   note.URI,
+	}
+	activityBytes, err := json.Marshal(activity)
+	if err != nil {
+		log.Printf("failed to marshal activity: %v", err)
+		ctx.RawRetrun([]byte(""), http.StatusInternalServerError)
+		return
+	}
+
+	followers, err := a.followerModel.ListFollowers()
+	if err != nil {
+		log.Printf("failed to list followers: %v", err)
+	} else {
+		for _, follower := range followers {
+			follower := follower
+			job := func() {
+				req, err := http.NewRequest("POST", follower.InboxURI, bytes.NewBuffer(activityBytes))
+				if err != nil {
+					log.Printf("failed to create request for follower %s: %v", follower.ActorURI, err)
+					return
+				}
+				req.Header.Set("Content-Type", "application/activity+json")
+				req.Header.Set("Date", time.Now().UTC().Format(http.TimeFormat))
+				inboxURL, err := url.Parse(follower.InboxURI)
+				if err != nil {
+					log.Printf("failed to parse inbox url for follower %s: %v", follower.ActorURI, err)
+					return
+				}
+				req.Header.Set("Host", inboxURL.Host)
+
+				sig, err := a.httpsigModel.GetByActor(actorURI)
+				if err != nil {
+					log.Printf("failed to get httpsig for %s: %v", actorURI, err)
+					return
+				}
+
+				block, _ := pem.Decode([]byte(sig.PrivateKey))
+				if block == nil {
+					log.Printf("failed to decode private key for %s", actorURI)
+					return
+				}
+				privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+				if err != nil {
+					log.Printf("failed to parse private key for %s: %v", actorURI, err)
+					return
+				}
+
+				keyID := actorURI + "#main-key"
+				prefs := []httpsig.Algorithm{httpsig.RSA_SHA256}
+				digestAlgo := httpsig.DigestSha256
+				headersToSign := []string{httpsig.RequestTarget, "host", "date", "digest"}
+				signer, _, err := httpsig.NewSigner(prefs, digestAlgo, headersToSign, httpsig.Signature, 65535)
+				if err != nil {
+					log.Printf("failed to create signer for %s: %v", actorURI, err)
+					return
+				}
+				if err := signer.SignRequest(privateKey, keyID, req, activityBytes); err != nil {
+					log.Printf("failed to sign request for %s: %v", follower.ActorURI, err)
+					return
+				}
+
+				client := &http.Client{}
+				resp, err := client.Do(req)
+				if err != nil {
+					log.Printf("failed to send delete activity to follower %s: %v", follower.ActorURI, err)
+					return
+				}
+				defer resp.Body.Close()
+
+				if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+					log.Printf("follower %s returned status %d for delete", follower.ActorURI, resp.StatusCode)
+				} else {
+					log.Printf("Successfully sent delete activity to follower %s", follower.ActorURI)
+				}
+			}
+			a.jobQueue.Enqueue(job)
+		}
 	}
 
 	err = a.noteModel.Delete(id)

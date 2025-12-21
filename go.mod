@@ -9,10 +9,15 @@ require (
 	golang.org/x/crypto v0.46.0
 )
 
+require golang.org/x/sys v0.39.0 // indirect
+
 require (
 	git.sr.ht/~mariusor/go-xsd-duration v0.0.0-20220703122237-02e73435a078 // indirect
 	github.com/go-ap/errors v0.0.0-20251216162958-cb99ea99a461 // indirect
 	github.com/go-ap/jsonld v0.0.0-20251216162253-e38fa664ea77 // indirect
+	github.com/go-fed/httpsig v1.1.0
+	github.com/gomarkdown/markdown v0.0.0-20250810172220-2e2c11897d1a
 	github.com/valyala/fastjson v1.6.7 // indirect
+	golang.org/x/net v0.48.0
 	golang.org/x/text v0.32.0 // indirect
 )

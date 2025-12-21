@@ -1,2 +1,2 @@
 # Knife
-A lightweight simple social media platform
+A lightweight ActivityPub blog platform
