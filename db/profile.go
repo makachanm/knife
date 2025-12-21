@@ -37,7 +37,7 @@ func (m *ProfileModel) Update(profile *Profile) error {
         UPDATE profile
         SET display_name = :display_name,
             avatar_url = :avatar_url,
-            bio = :bio,
+            bio = :bio
         WHERE finger = :finger
     `
 	_, err := m.DB.NamedExec(query, profile)

@@ -48,19 +48,6 @@ func (a *ProfileAPI) updateProfile(ctx base.APIContext) {
 		return
 	}
 
-	//var profile_n *db.Profile
-	profile_n, err := a.profileModel.Get()
-	profile.Finger = profile_n.Finger
-
-	if err != nil {
-		if err == sql.ErrNoRows {
-			ctx.ReturnError("notfound", "Profile not found", http.StatusNotFound)
-		} else {
-			ctx.ReturnError("dberror", err.Error(), http.StatusInternalServerError)
-		}
-		return
-	}
-
 	if err := a.profileModel.Update(&profile); err != nil {
 		ctx.ReturnError("dberror", err.Error(), http.StatusInternalServerError)
 		return
