@@ -13,10 +13,11 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 
-	"github.com/go-fed/httpsig"
-	"github.com/gomarkdown/markdown"
 	"knife/base"
 	"knife/db"
+
+	"github.com/go-fed/httpsig"
+	"github.com/gomarkdown/markdown"
 )
 
 type NoteAPI struct {
@@ -33,7 +34,7 @@ func NewNoteAPI(noteModel *db.NoteModel, profileModel *db.ProfileModel, follower
 
 // RegisterHandlers registers the API handlers for notes.
 func (a *NoteAPI) RegisterHandlers(router *base.APIRouter) {
-	router.GET("notes", a.listNotes, nil)
+	router.GET("notes", a.listNotes, []string{"AuthMiddleware"})
 	router.POST("notes", a.createNote, []string{"AuthMiddleware"})
 	router.GET("notes/{id}", a.getNote, nil)
 	router.DELETE("notes/{id}", a.deleteNote, []string{"AuthMiddleware"})
