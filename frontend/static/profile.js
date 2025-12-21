@@ -64,11 +64,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span class='finger'>@${escapeHTML(note.author_finger)}</span>
                     </div>
                 </div>
-                <div class='note-content'>${note.content}</div>
+                <div class='note-content'></div>
                 <div class='note-meta'>
                     <a href='/notes/${note.id}' class='note-link-time'>Posted on ${createTime}</a>
                 </div>
             `;
+
+            // Insert HTML content into the note-content div
+            const noteContentDiv = noteElement.querySelector('.note-content');
+            noteContentDiv.innerHTML = note.content; // Directly insert HTML content
+
             recentPostsContainer.appendChild(noteElement);
         });
     }
@@ -84,7 +89,6 @@ document.addEventListener('DOMContentLoaded', () => {
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#039;');
     }
-
 
     fetchProfile();
     fetchNotes();

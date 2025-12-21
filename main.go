@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"io/fs"
 	"log"
@@ -14,9 +15,11 @@ import (
 	"knife/api"
 	"knife/base"
 	"knife/db"
+	"knife/etc"
 )
 
 func main() {
+	fmt.Println("Knife version ", etc.Version)
 	if len(os.Args) > 1 && os.Args[1] == "setup" {
 		initializes()
 		return
@@ -54,17 +57,19 @@ func main() {
 	followerModel := db.NewFollowerModel(dbconn)
 	bookmarkModel := db.NewBookmarkModel(dbconn)
 	httpsigModel := db.NewHTTPSigModel(dbconn)
+	draftModel := db.NewDraftModel(dbconn)
 	log.Println("Models initialized.")
 
 	authAPI := api.NewAuthAPI(profileModel, secretKey)
 	profileAPI := api.NewProfileAPI(profileModel)
 	noteAPI := api.NewNoteAPI(noteModel, profileModel, followerModel, httpsigModel, jobQueue)
 	bookmarkAPI := api.NewBookmarkAPI(bookmarkModel, noteModel)
+	draftAPI := api.NewDraftAPI(draftModel)
 	activityPubAPI := ap.NewActivityPubAPI(noteModel, profileModel, followerModel, httpsigModel)
 	log.Println("APIs initialized.")
 
 	// --- 라우터 설정 ---
-	apiRouter := setupAPIRouter(authAPI, profileAPI, noteAPI, bookmarkAPI)
+	apiRouter := setupAPIRouter(authAPI, profileAPI, noteAPI, bookmarkAPI, draftAPI)
 	mainMux := setupMainRouter(apiRouter, activityPubAPI)
 	log.Println("Router setup complete.")
 
@@ -132,12 +137,13 @@ func initializeJobQueue() *base.JobQueue {
 }
 
 // --- 라우터 설정 함수 ---
-func setupAPIRouter(authAPI *api.AuthAPI, profileAPI *api.ProfileAPI, noteAPI *api.NoteAPI, bookmarkAPI *api.BookmarkAPI) base.APIRouter {
+func setupAPIRouter(authAPI *api.AuthAPI, profileAPI *api.ProfileAPI, noteAPI *api.NoteAPI, bookmarkAPI *api.BookmarkAPI, draftAPI *api.DraftAPI) base.APIRouter {
 	apiRouter := base.NewAPIRouter()
 	authAPI.RegisterHandlers(&apiRouter)
 	profileAPI.RegisterHandlers(&apiRouter)
 	noteAPI.RegisterHandlers(&apiRouter)
 	bookmarkAPI.RegisterHandlers(&apiRouter)
+	draftAPI.RegisterHandlers(&apiRouter)
 
 	// Apply authentication middleware to protected routes
 	apiRouter.RegisterMidddleware(api.NewAuthMiddleware(authAPI))

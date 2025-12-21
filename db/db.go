@@ -37,8 +37,21 @@ func InitDB(dataSourceName string) (*DB, error) {
 		return nil, err
 	}
 
+	if _, err := db.Exec(schemaDrafts); err != nil {
+		return nil, err
+	}
+
 	return &DB{db}, nil
 }
+
+const schemaDrafts = `
+CREATE TABLE IF NOT EXISTS drafts (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	content TEXT NOT NULL,
+	create_time DATETIME NOT NULL,
+	update_time DATETIME NOT NULL
+);
+`
 
 const schemaHTTPSigs = `
 CREATE TABLE IF NOT EXISTS httpsigs (

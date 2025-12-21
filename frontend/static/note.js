@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </div>
                 ${note.cw ? `<div class='note-cw'>CW: ${escapeHTML(note.cw)}</div>` : ''}
-                <div class='note-content'>${escapeHTML(note.content)}</div>
+                <div class='note-content'><iframe>${note.content}</iframe></div>
                 <div class='note-meta'>
                     <span>Posted on ${createTime}</span>
                     <br />
