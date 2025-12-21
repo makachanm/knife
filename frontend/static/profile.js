@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchNotes() {
         try {
-            const response = await fetch('/api/notes');
+            const response = await fetch('/api/profile/recent');
             if (!response.ok) {
                 throw new Error('Could not fetch notes');
             }
@@ -68,6 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class='note-meta'>
                     <a href='/notes/${note.id}' class='note-link-time'>Posted on ${createTime}</a>
                 </div>
+                <hr />
             `;
 
             // Insert HTML content into the note-content div

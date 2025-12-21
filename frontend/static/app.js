@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderNotes(notes) {
         if (!notes || notes.length === 0) {
-            timeline.innerHTML = '<p>No notes yet. Be the first to post!</p>';
+            timeline.innerHTML = '<p>No notes yet.</p>';
             return;
         }
 
@@ -45,18 +45,17 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span class='finger'>@${escapeHTML(note.author_finger)}</span>
                     </div>
                 </div>
-                ${note.cw ? `<div class='note-cw'>CW: ${escapeHTML(note.cw)}</div>` : ''}
-                <div class='note-content'>${escapeHTML(note.content)}</div>
+                <div class='note-content'></div>
                 <div class='note-meta'>
                     <a href='/notes/${note.id}' class='note-link-time'>Posted on ${createTime}</a>
-                    <br />
-                    <span class='public-range'>${publicRanges[note.public_range] || 'Unknown'}</span>
                 </div>
-                <div class='note-actions'>
-                    <button class='bookmark-button' data-note-id='${note.id}'>Bookmark</button>
-                    <button class='delete-button'>Delete</button>
-                </div>
+                <hr />
             `;
+
+            // Insert HTML content into the note-content div
+            const noteContentDiv = noteElement.querySelector('.note-content');
+            noteContentDiv.innerHTML = note.content; // Directly insert HTML content
+
             timeline.appendChild(noteElement);
         });
     }

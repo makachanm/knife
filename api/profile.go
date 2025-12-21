@@ -11,15 +11,17 @@ import (
 
 type ProfileAPI struct {
 	profileModel *db.ProfileModel
+	noteModel    *db.NoteModel
 }
 
-func NewProfileAPI(profileModel *db.ProfileModel) *ProfileAPI {
-	return &ProfileAPI{profileModel: profileModel}
+func NewProfileAPI(profileModel *db.ProfileModel, noteModel *db.NoteModel) *ProfileAPI {
+	return &ProfileAPI{profileModel: profileModel, noteModel: noteModel}
 }
 
 // RegisterHandlers registers the API handlers for profiles.
 func (a *ProfileAPI) RegisterHandlers(router *base.APIRouter) {
 	router.GET("profile", a.getProfile, nil)
+	router.GET("profile/recent", a.getRecentNotes, nil)
 	router.PUT("profile", a.updateProfile, []string{"AuthMiddleware"})
 }
 
@@ -65,4 +67,14 @@ func (a *ProfileAPI) updateProfile(ctx base.APIContext) {
 	}
 
 	ctx.ReturnJSON(profile)
+}
+
+func (a *ProfileAPI) getRecentNotes(ctx base.APIContext) {
+	notes, err := a.noteModel.ListByMyRecent()
+	if err != nil {
+		ctx.ReturnError("dberror", err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	ctx.ReturnJSON(notes)
 }

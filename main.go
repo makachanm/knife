@@ -61,7 +61,7 @@ func main() {
 	log.Println("Models initialized.")
 
 	authAPI := api.NewAuthAPI(profileModel, secretKey)
-	profileAPI := api.NewProfileAPI(profileModel)
+	profileAPI := api.NewProfileAPI(profileModel, noteModel)
 	noteAPI := api.NewNoteAPI(noteModel, profileModel, followerModel, httpsigModel, jobQueue)
 	bookmarkAPI := api.NewBookmarkAPI(bookmarkModel, noteModel)
 	draftAPI := api.NewDraftAPI(draftModel)

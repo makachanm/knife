@@ -23,7 +23,7 @@ type Note struct {
 	AuthorName   string          `db:"author_name" json:"author_name"`
 	AuthorFinger string          `db:"author_finger" json:"author_finger"`
 	Medias       string          `db:"medias" json:"medias,omitempty"`
-	PublicRange  NotePublicRange `db:"public_range" json:"public_range"`
+	PublicRange  NotePublicRange `db:"public_range" json:"public_range,string"`
 	CreateTime   time.Time       `db:"create_time" json:"create_time"`
 }
 
@@ -126,5 +126,23 @@ func (m *NoteModel) ListRecent() ([]Note, error) {
 	var notes []Note
 	query := "SELECT * FROM notes ORDER BY create_time DESC LIMIT 100"
 	err := m.DB.Select(&notes, query)
+	return notes, err
+}
+
+func (m *NoteModel) ListByMyRecent() ([]Note, error) {
+	var notes []Note
+
+	fquery := `SELECT finger FROM profile LIMIT 1`
+	var myFinger string
+	err := m.DB.Get(&myFinger, fquery)
+	if err != nil {
+		return nil, err
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	query := "SELECT * FROM notes WHERE author_finger = ? ORDER BY create_time DESC LIMIT 100"
+	err = m.DB.Select(&notes, query, myFinger)
 	return notes, err
 }

@@ -119,7 +119,7 @@ func (context *APIContext) GetContext(v any) error {
 
 		err := json.Unmarshal(context.rawBodyData, &v)
 		if err != nil {
-			log.Fatalf(err.Error())
+			log.Println("Failed to unmarshal request body:", err)
 			context.ReturnError("servererror", "internal server deserialize error", http.StatusInternalServerError)
 			return err
 		}
