@@ -21,29 +21,27 @@
     </div>
 </header>
 
-    <main class="container layout">
-        <section class="content">
-            <div class="page-title">
-                <h1>Write a New Post</h1>
-            </div>
+    <main class="container">
+        <div class="page-title">
+            <h1>Write a New Post</h1>
+        </div>
 
-            <div id="note-creation-app">
-                <form id="note-form" class="form">
-                    <textarea id="content" name="content" placeholder="What's on your mind?" required></textarea>
-                    <input type="text" id="cw" name="cw" placeholder="Content Warning (optional)">
-                    <label for="public_range">Visibility:</label>
-                    <select id="public_range" name="public_range">
-                        <option value="3" selected>Public</option>
-                        <option value="2">Unlisted</option>
-                        <option value="1">Followers Only</option>
-                        <option value="0">Private</option>
-                    </select>
-                    <button type="submit">Post</button>
-                    <button type="button" id="save-draft">Save Draft</button>
-                </form>
-                <div id="form-error" class="error-message"></div>
-            </div>
-        </section>
+        <div id="note-creation-app">
+            <form id="note-form" class="form">
+                <textarea id="content" name="content" placeholder="What's on your mind?" required></textarea>
+                <input type="text" id="cw" name="cw" placeholder="Content Warning (optional)">
+                <label for="public_range">Visibility:</label>
+                <select id="public_range" name="public_range">
+                    <option value="3" selected>Public</option>
+                    <option value="2">Unlisted</option>
+                    <option value="1">Followers Only</option>
+                    <option value="0">Private</option>
+                </select>
+                <button type="submit">Post</button>
+                <button type="button" id="save-draft">Save Draft</button>
+            </form>
+            <div id="form-error" class="error-message"></div>
+        </div>
     </main>
 
     <script src="/static/new-note.js"></script>

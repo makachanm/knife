@@ -85,6 +85,10 @@ func (context *APIContext) GetCookie(name string) (*http.Cookie, error) {
 	return context.req.Cookie(name)
 }
 
+func (context *APIContext) GetHeader(name string) string { 
+	return context.res.Header().Get(name)
+}
+
 func (context *APIContext) GetPathParamValue(key string) string {
 	return context.req.PathValue(key)
 }

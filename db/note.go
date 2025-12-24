@@ -22,7 +22,6 @@ type Note struct {
 	Host         string          `db:"host" json:"host"`
 	AuthorName   string          `db:"author_name" json:"author_name"`
 	AuthorFinger string          `db:"author_finger" json:"author_finger"`
-	Medias       string          `db:"medias" json:"medias,omitempty"`
 	PublicRange  NotePublicRange `db:"public_range" json:"public_range,string"`
 	CreateTime   time.Time       `db:"create_time" json:"create_time"`
 }
@@ -38,8 +37,8 @@ func NewNoteModel(db *DB) *NoteModel {
 // CreateFederatedNote creates a note that already has a URI (e.g., from ActivityPub).
 func (m *NoteModel) CreateFederatedNote(note *Note) error {
 	query := `
-		INSERT INTO notes (uri, cw, content, host, author_name, medias, public_range, author_finger)
-		VALUES (:uri, :cw, :content, :host, :author_name, :medias, :public_range, :author_finger)
+		INSERT INTO notes (uri, cw, content, host, author_name, public_range, author_finger)
+		VALUES (:uri, :cw, :content, :host, :author_name, :public_range, :author_finger)
 	`
 
 	_, err := m.DB.NamedExec(query, note)
@@ -61,8 +60,8 @@ func (m *NoteModel) CreateLocalNote(note *Note) error {
 
 	// Insert the note without the URI
 	query := `
-		INSERT INTO notes (cw, content, host, author_name, medias, public_range, author_finger)
-		VALUES (:cw, :content, :host, :author_name, :medias, :public_range, :author_finger)
+		INSERT INTO notes (cw, content, host, author_name, public_range, author_finger)
+		VALUES (:cw, :content, :host, :author_name, :public_range, :author_finger)
 	`
 	result, err := tx.NamedExec(query, note)
 	if err != nil {
@@ -88,7 +87,7 @@ func (m *NoteModel) CreateLocalNote(note *Note) error {
 
 func (m *NoteModel) Get(id int64) (*Note, error) {
 	var note Note
-	query := "SELECT * FROM notes WHERE id = ?"
+	query := "SELECT id, uri, cw, content, host, author_name, author_finger, public_range, create_time FROM notes WHERE id = ?"
 	err := m.DB.Get(&note, query, id)
 	return &note, err
 }
@@ -97,7 +96,7 @@ func (m *NoteModel) Get(id int64) (*Note, error) {
 func (m *NoteModel) Update(note *Note) error {
 	query := `
 		UPDATE notes
-		SET uri = :uri, cw = :cw, content = :content, medias = :medias, public_range = :public_range
+		SET uri = :uri, cw = :cw, content = :content, public_range = :public_range
 		WHERE id = :id
 	`
 	_, err := m.DB.NamedExec(query, note)
@@ -124,7 +123,7 @@ func (m *NoteModel) DeleteByURI(uri string) error {
 
 func (m *NoteModel) ListRecent() ([]Note, error) {
 	var notes []Note
-	query := "SELECT * FROM notes ORDER BY create_time DESC LIMIT 100"
+	query := "SELECT id, uri, cw, content, host, author_name, author_finger, public_range, create_time FROM notes ORDER BY create_time DESC LIMIT 100"
 	err := m.DB.Select(&notes, query)
 	return notes, err
 }
@@ -139,10 +138,7 @@ func (m *NoteModel) ListByMyRecent() ([]Note, error) {
 		return nil, err
 	}
 
-	if err != nil {
-		return nil, err
-	}
-	query := "SELECT * FROM notes WHERE author_finger = ? ORDER BY create_time DESC LIMIT 100"
+	query := "SELECT id, uri, cw, content, host, author_name, author_finger, public_range, create_time FROM notes WHERE author_finger = ? ORDER BY create_time DESC LIMIT 100"
 	err = m.DB.Select(&notes, query, myFinger)
 	return notes, err
 }

@@ -77,7 +77,6 @@ CREATE TABLE IF NOT EXISTS notes (
     content TEXT NOT NULL,
     host TEXT NOT NULL,
     author_name TEXT NOT NULL,
-    medias TEXT NOT NULL,
     public_range INTEGER NOT NULL,
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	author_finger TEXT NOT NULL

@@ -32,6 +32,18 @@ func NewNoteAPI(noteModel *db.NoteModel, profileModel *db.ProfileModel, follower
 	return &NoteAPI{noteModel: noteModel, profileModel: profileModel, followerModel: followerModel, httpsigModel: httpsigModel, jobQueue: jobQueue}
 }
 
+type NoteResponse struct {
+	ID           int64              `json:"id"`
+	URI          string             `json:"uri"`
+	Cw           string             `json:"cw,omitempty"`
+	Content      string             `json:"content"`
+	Host         string             `json:"host"`
+	AuthorName   string             `json:"author_name"`
+	AuthorFinger string             `json:"author_finger"`
+	PublicRange  db.NotePublicRange `json:"public_range,string"`
+	CreateTime   time.Time          `json:"create_time"`
+}
+
 // RegisterHandlers registers the API handlers for notes.
 func (a *NoteAPI) RegisterHandlers(router *base.APIRouter) {
 	router.GET("notes", a.listNotes, []string{"AuthMiddleware"})
@@ -46,7 +58,23 @@ func (a *NoteAPI) listNotes(ctx base.APIContext) {
 		ctx.ReturnError("dberror", err.Error(), http.StatusInternalServerError)
 		return
 	}
-	ctx.ReturnJSON(notes)
+
+	noteResponses := make([]NoteResponse, 0, len(notes))
+	for _, note := range notes {
+		noteResponses = append(noteResponses, NoteResponse{
+			ID:           note.ID,
+			URI:          note.URI,
+			Cw:           note.Cw,
+			Content:      note.Content,
+			Host:         note.Host,
+			AuthorName:   note.AuthorName,
+			AuthorFinger: note.AuthorFinger,
+			PublicRange:  note.PublicRange,
+			CreateTime:   note.CreateTime,
+		})
+	}
+
+	ctx.ReturnJSON(noteResponses)
 }
 
 func (a *NoteAPI) createNote(ctx base.APIContext) {
@@ -190,7 +218,19 @@ func (a *NoteAPI) getNote(ctx base.APIContext) {
 		return
 	}
 
-	ctx.ReturnJSON(note)
+	response := NoteResponse{
+		ID:           note.ID,
+		URI:          note.URI,
+		Cw:           note.Cw,
+		Content:      note.Content,
+		Host:         note.Host,
+		AuthorName:   note.AuthorName,
+		AuthorFinger: note.AuthorFinger,
+		PublicRange:  note.PublicRange,
+		CreateTime:   note.CreateTime,
+	}
+
+	ctx.ReturnJSON(response)
 }
 
 func (a *NoteAPI) deleteNote(ctx base.APIContext) {

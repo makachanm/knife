@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
-
 	"knife/base"
 	"knife/db"
 )
@@ -63,5 +62,20 @@ func (a *ProfileAPI) getRecentNotes(ctx base.APIContext) {
 		return
 	}
 
-	ctx.ReturnJSON(notes)
+	noteResponses := make([]NoteResponse, 0, len(notes))
+	for _, note := range notes {
+		noteResponses = append(noteResponses, NoteResponse{
+			ID:           note.ID,
+			URI:          note.URI,
+			Cw:           note.Cw,
+			Content:      note.Content,
+			Host:         note.Host,
+			AuthorName:   note.AuthorName,
+			AuthorFinger: note.AuthorFinger,
+			PublicRange:  note.PublicRange,
+			CreateTime:   note.CreateTime,
+		})
+	}
+
+	ctx.ReturnJSON(noteResponses)
 }

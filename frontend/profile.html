@@ -21,32 +21,30 @@
     </div>
 </header>
 
-    <main class="container layout">
-        <section class="content">
-            <div class="page-title">
-                <h1>Your Profile</h1>
-            </div>
+    <main class="container">
+        <div class="page-title">
+            <h1>Your Profile</h1>
+        </div>
 
-            <div id="profile-app">
-                <div class="profile-header">
-                    <h2 id="profile-name-header">Your Name</h2>
-                    <p id="profile-finger">@yourhandle</p>
-                </div>
-                <div class="profile-info">
-                    <h3>About Me</h3>
-                    <p id="profile-bio">This is your bio. Share something about yourself.</p>
-                </div>
-                <a href="/profile-settings" class="button">Edit Profile</a>
+        <div id="profile-app">
+            <div class="profile-header">
+                <h2 id="profile-name-header">Your Name</h2>
+                <p id="profile-finger">@yourhandle</p>
             </div>
-            <div id="profile-error" class="error-message"></div>
+            <div class="profile-info">
+                <h3>About Me</h3>
+                <p id="profile-bio">This is your bio. Share something about yourself.</p>
+            </div>
+            <a href="/profile-settings" class="button">Edit Profile</a>
+        </div>
+        <div id="profile-error" class="error-message"></div>
 
-            <div class="recent-posts">
-                <h2>Recent Posts</h2>
-                <div id="recent-posts-container">
-                    <!-- Posts will be loaded here by profile.js -->
-                </div>
+        <div class="recent-posts">
+            <h2>Recent Posts</h2>
+            <div id="recent-posts-container">
+                <!-- Posts will be loaded here by profile.js -->
             </div>
-        </section>
+        </div>
     </main>
 
     <script src="/static/profile.js"></script>
