@@ -64,11 +64,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span class='finger'>@${escapeHTML(note.author_finger)}</span>
                     </div>
                 </div>
+                <hr />
                 <div class='note-content'></div>
                 <div class='note-meta'>
                     <a href='/notes/${note.id}' class='note-link-time'>Posted on ${createTime}</a>
                 </div>
-                <hr />
             `;
 
             // Insert HTML content into the note-content div
