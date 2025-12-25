@@ -65,11 +65,12 @@ func main() {
 	noteAPI := api.NewNoteAPI(noteModel, profileModel, followerModel, httpsigModel, jobQueue)
 	bookmarkAPI := api.NewBookmarkAPI(bookmarkModel, noteModel)
 	draftAPI := api.NewDraftAPI(draftModel)
+	categoryAPI := api.NewCategoryAPI(noteModel)
 	activityPubAPI := ap.NewActivityPubAPI(noteModel, profileModel, followerModel, httpsigModel)
 	log.Println("APIs initialized.")
 
 	// --- 라우터 설정 ---
-	apiRouter := setupAPIRouter(authAPI, profileAPI, noteAPI, bookmarkAPI, draftAPI)
+	apiRouter := setupAPIRouter(authAPI, profileAPI, noteAPI, bookmarkAPI, draftAPI, categoryAPI)
 	mainMux := setupMainRouter(apiRouter, activityPubAPI)
 	log.Println("Router setup complete.")
 
@@ -137,13 +138,14 @@ func initializeJobQueue() *base.JobQueue {
 }
 
 // --- 라우터 설정 함수 ---
-func setupAPIRouter(authAPI *api.AuthAPI, profileAPI *api.ProfileAPI, noteAPI *api.NoteAPI, bookmarkAPI *api.BookmarkAPI, draftAPI *api.DraftAPI) base.APIRouter {
+func setupAPIRouter(authAPI *api.AuthAPI, profileAPI *api.ProfileAPI, noteAPI *api.NoteAPI, bookmarkAPI *api.BookmarkAPI, draftAPI *api.DraftAPI, categoryAPI *api.CategoryAPI) base.APIRouter {
 	apiRouter := base.NewAPIRouter()
 	authAPI.RegisterHandlers(&apiRouter)
 	profileAPI.RegisterHandlers(&apiRouter)
 	noteAPI.RegisterHandlers(&apiRouter)
 	bookmarkAPI.RegisterHandlers(&apiRouter)
 	draftAPI.RegisterHandlers(&apiRouter)
+	categoryAPI.RegisterHandlers(&apiRouter)
 
 	// Apply authentication middleware to protected routes
 	apiRouter.RegisterMidddleware(api.NewAuthMiddleware(authAPI))

@@ -143,3 +143,17 @@ func (m *NoteModel) ListByMyRecent() ([]Note, error) {
 	err = m.DB.Select(&notes, query, myFinger)
 	return notes, err
 }
+
+func (m *NoteModel) ListCategories() ([]string, error) {
+	var categories []string
+	query := "SELECT DISTINCT category FROM notes WHERE category != '' AND category IS NOT NULL ORDER BY category ASC"
+	err := m.DB.Select(&categories, query)
+	return categories, err
+}
+
+func (m *NoteModel) ListByCategory(category string) ([]Note, error) {
+	var notes []Note
+	query := "SELECT id, uri, cw, content, host, author_name, author_finger, public_range, create_time, category FROM notes WHERE category = ? ORDER BY create_time DESC LIMIT 100"
+	err := m.DB.Select(&notes, query, category)
+	return notes, err
+}
