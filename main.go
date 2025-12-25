@@ -60,9 +60,11 @@ func main() {
 	draftModel := db.NewDraftModel(dbconn)
 	log.Println("Models initialized.")
 
+	activityDispatcher := ap.NewActivityDispatcher(followerModel, httpsigModel, jobQueue)
+
 	authAPI := api.NewAuthAPI(profileModel, secretKey)
 	profileAPI := api.NewProfileAPI(profileModel, noteModel)
-	noteAPI := api.NewNoteAPI(noteModel, profileModel, followerModel, httpsigModel, jobQueue)
+	noteAPI := api.NewNoteAPI(noteModel, profileModel, followerModel, activityDispatcher)
 	bookmarkAPI := api.NewBookmarkAPI(bookmarkModel, noteModel)
 	draftAPI := api.NewDraftAPI(draftModel)
 	categoryAPI := api.NewCategoryAPI(noteModel)
