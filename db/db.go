@@ -41,6 +41,10 @@ func InitDB(dataSourceName string) (*DB, error) {
 		return nil, err
 	}
 
+	// Migration: Add category column to notes if it doesn't exist
+	// We ignore the error because it likely means the column already exists
+	db.Exec("ALTER TABLE notes ADD COLUMN category TEXT DEFAULT ''")
+
 	return &DB{db}, nil
 }
 
@@ -79,7 +83,8 @@ CREATE TABLE IF NOT EXISTS notes (
     author_name TEXT NOT NULL,
     public_range INTEGER NOT NULL,
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	author_finger TEXT NOT NULL
+	author_finger TEXT NOT NULL,
+	category TEXT DEFAULT ''
 );`
 
 const schemaProfiles = `

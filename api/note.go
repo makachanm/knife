@@ -42,6 +42,7 @@ type NoteResponse struct {
 	AuthorFinger string             `json:"author_finger"`
 	PublicRange  db.NotePublicRange `json:"public_range,string"`
 	CreateTime   time.Time          `json:"create_time"`
+	Category     string             `json:"category,omitempty"`
 }
 
 // RegisterHandlers registers the API handlers for notes.
@@ -71,6 +72,7 @@ func (a *NoteAPI) listNotes(ctx base.APIContext) {
 			AuthorFinger: note.AuthorFinger,
 			PublicRange:  note.PublicRange,
 			CreateTime:   note.CreateTime,
+			Category:     note.Category,
 		})
 	}
 
@@ -228,6 +230,7 @@ func (a *NoteAPI) getNote(ctx base.APIContext) {
 		AuthorFinger: note.AuthorFinger,
 		PublicRange:  note.PublicRange,
 		CreateTime:   note.CreateTime,
+		Category:     note.Category,
 	}
 
 	ctx.ReturnJSON(response)

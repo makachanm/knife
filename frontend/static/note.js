@@ -51,6 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class='note-content'>${note.content}</div>
                 <div class='note-meta'>
                     <span>Posted on ${createTime}</span>
+                    ${note.category ? `<br /><span>Category: ${escapeHTML(note.category)}</span>` : ''}
                     <br />
                     <span class='public-range'>${publicRanges[note.public_range] || 'Unknown'}</span>
                     <br />

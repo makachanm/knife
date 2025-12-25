@@ -49,6 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class='note-content'></div>
                 <div class='note-meta'>
                     <a href='/notes/${note.id}' class='note-link-time'>Posted on ${createTime}</a>
+                    ${note.category ? `<span> | Category: ${escapeHTML(note.category)}</span>` : ''}
                 </div>
             `;
 

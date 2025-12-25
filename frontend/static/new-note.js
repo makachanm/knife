@@ -1,6 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
     const contentField = document.getElementById("content");
     const cwField = document.getElementById("cw");
+    const categoryField = document.getElementById("category");
     const visibilityField = document.getElementById("public_range");
     const saveDraftButton = document.getElementById("save-draft");
     const formError = document.getElementById("form-error");
@@ -18,6 +19,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     currentDraftId = latestDraft.id;
                     contentField.value = latestDraft.content || "";
                     cwField.value = latestDraft.cw || "";
+                    if (latestDraft.category) categoryField.value = latestDraft.category;
                     visibilityField.value = latestDraft.public_range || "3";
                 }
             }
@@ -31,6 +33,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const draftData = {
             content: contentField.value,
             cw: cwField.value,
+            category: categoryField.value,
             public_range: visibilityField.value,
         };
 
@@ -90,6 +93,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const noteData = {
             content: contentField.value,
             cw: cwField.value,
+            category: categoryField.value,
             public_range: visibilityField.value,
         };
 
