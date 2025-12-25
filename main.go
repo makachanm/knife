@@ -188,6 +188,8 @@ func setupMainRouter(apiRouter base.APIRouter, activityPubAPI *ap.ActivityPubAPI
 
 	// Serve HTML files
 	mainMux.HandleFunc("/", serveFile("frontend/index.html"))
+	mainMux.HandleFunc("/categories", serveFile("frontend/categories.html"))
+	mainMux.HandleFunc("/category/", serveFile("frontend/category.html"))
 	mainMux.HandleFunc("/new-note", serveFile("frontend/new-note.html"))
 	mainMux.HandleFunc("/profile-settings", serveFile("frontend/profile-settings.html"))
 	mainMux.HandleFunc("/bookmarks", serveFile("frontend/bookmarks.html"))

@@ -281,3 +281,28 @@ body {
     }
 
 }
+
+/* Category List */
+.category-list-items {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.category-pill {
+    display: inline-block;
+    background-color: #e9ecef;
+    color: #495057;
+    padding: 0.5rem 1rem;
+    border-radius: 50px;
+    text-decoration: none;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.category-pill:hover {
+    background-color: #007bff;
+    color: white;
+    text-decoration: none;
+}
