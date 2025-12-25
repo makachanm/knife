@@ -10,10 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
-
-	"golang.org/x/net/html"
-	"golang.org/x/net/html/atom"
 
 	// For knife.Version
 	"knife/db"
@@ -175,51 +171,10 @@ func (a *ActivityPubAPI) Note(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Determine visibility based on PublicRange
-	to, cc := a.getVisibilityTargets(note)
-
-	apNote := map[string]interface{}{
-		"@context":     "https://www.w3.org/ns/activitystreams",
-		"id":           note.URI,
-		"type":         "Note",
-		"attributedTo": "https://" + r.Host + "/profile",
-		"content":      note.Content,
-		"published":    note.CreateTime.Format("2006-01-02T15:04:05Z"), // RFC3339 format
-		"to":           to,
-		"cc":           cc,
-	}
-
-	if note.Cw != "" { 
-		apNote["sensitive"] = true
-		apNote["summary"] = note.Cw
-	}
+	apNote := GenerateAPNote(note)
 
 	w.Header().Set("Content-Type", "application/activity+json; charset=utf-8")
 	json.NewEncoder(w).Encode(apNote)
-}
-
-// getVisibilityTargets determines the "to" and "cc" fields based on the note's visibility.
-func (a *ActivityPubAPI) getVisibilityTargets(note *db.Note) ([]string, []string) {
-	var to []string
-	var cc []string
-
-	switch note.PublicRange {
-	case db.NotePublicRangePublic:
-		to = []string{"https://www.w3.org/ns/activitystreams#Public"}
-	case db.NotePublicRangeFollowers:
-		to = []string{}
-		cc = []string{"https://" + note.Host + "/followers"}
-	case db.NotePublicRangeUnlisted:
-		to = []string{}
-		cc = []string{"https://www.w3.org/ns/activitystreams#Public"}
-	case db.NotePublicRangePrivate:
-		to = []string{"https://" + note.Host + "/profile"}
-	default:
-		// Default to private if the range is unknown
-		to = []string{"https://" + note.Host + "/profile"}
-	}
-
-	return to, cc
 }
 
 func (a *ActivityPubAPI) sendActivity(inbox string, actorIRI string, activity interface{}) error {
@@ -399,12 +354,20 @@ func (a *ActivityPubAPI) handleCreateActivity(act *activitypub.Activity) error {
 		}
 
 		// Determine the visibility of the note
-		publicRange := a.determinePublicRange(obj)
+		var to []string
+		for _, item := range obj.To {
+			to = append(to, item.GetLink().String())
+		}
+		var cc []string
+		for _, item := range obj.CC {
+			cc = append(cc, item.GetLink().String())
+		}
+		publicRange := DeterminePublicRange(to, cc)
 
 		log.Printf("Inbox: Creating federated note from %s", obj.GetID())
 		note := &db.Note{
 			URI:          obj.GetID().String(),
-			Content:      stripHTML(obj.Content.First().String()),
+			Content:      StripHTML(obj.Content.First().String()),
 			AuthorFinger: authorFinger,
 			Host:         authorHost,
 			AuthorName:   authorName,
@@ -412,36 +375,6 @@ func (a *ActivityPubAPI) handleCreateActivity(act *activitypub.Activity) error {
 		}
 		return a.noteModel.CreateFederatedNote(note)
 	})
-}
-
-// determinePublicRange determines the public range of a note based on its "to" and "cc" fields.
-func (a *ActivityPubAPI) determinePublicRange(obj *activitypub.Object) db.NotePublicRange {
-	to := obj.To
-	cc := obj.CC
-
-	// Check if the note is public
-	for _, item := range append(to, cc...) {
-		if item.GetLink() == "https://www.w3.org/ns/activitystreams#Public" {
-			return db.NotePublicRangePublic
-		}
-	}
-
-	// Check if the note is for followers
-	for _, item := range to {
-		if item.GetLink() == obj.GetLink() { // Replace with your followers URL
-			return db.NotePublicRangeFollowers
-		}
-	}
-
-	// Check if the note is unlisted
-	for _, item := range cc {
-		if item.GetLink() == "https://www.w3.org/ns/activitystreams#Public" {
-			return db.NotePublicRangeUnlisted
-		}
-	}
-
-	// Default to private
-	return db.NotePublicRangePrivate
 }
 
 // handleUpdateActivity processes Update activities.
@@ -453,7 +386,7 @@ func (a *ActivityPubAPI) handleUpdateActivity(act *activitypub.Activity) error {
 		log.Printf("Inbox: Updating federated note %s", obj.GetID())
 		note := &db.Note{
 			URI:     obj.GetID().String(),
-			Content: stripHTML(obj.Content.First().String()),
+			Content: StripHTML(obj.Content.First().String()),
 		}
 		return a.noteModel.UpdateFederatedNote(note)
 	})
@@ -548,49 +481,3 @@ func fetchActor(iri string) (*activitypub.Actor, error) {
 	return actor, nil
 }
 
-// stripHTML takes a string that contains HTML and returns just the text content.
-func stripHTML(s string) string {
-	if !strings.Contains(s, "<") {
-		return s
-	}
-	// The context for ParseFragment is a body tag, which is a reasonable default.
-	nodes, err := html.ParseFragment(strings.NewReader(s), &html.Node{
-		Type:     html.ElementNode,
-		Data:     "body",
-		DataAtom: atom.Body,
-	})
-	if err != nil {
-		// Fallback to original string on parse error.
-		return s
-	}
-
-	var b strings.Builder
-	var f func(*html.Node)
-	f = func(n *html.Node) {
-		if n.Type == html.TextNode {
-			// When parsing fragments, newlines can be introduced as text nodes.
-			// We can trim space to avoid extra whitespace.
-			b.WriteString(strings.TrimSpace(n.Data))
-		}
-		// Traverse children
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			if n.Type == html.ElementNode {
-				if n.DataAtom == atom.Script || n.DataAtom == atom.Style {
-					continue
-				}
-			}
-			f(c)
-			// Add a space between block-level elements
-			if c.Type == html.ElementNode && (c.DataAtom == atom.P || c.DataAtom == atom.Div || c.DataAtom == atom.Br) {
-				b.WriteString(" ")
-			}
-		}
-	}
-
-	for _, n := range nodes {
-		f(n)
-	}
-
-	// Clean up multiple spaces.
-	return strings.Join(strings.Fields(b.String()), " ")
-}

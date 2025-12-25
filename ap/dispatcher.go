@@ -39,15 +39,7 @@ func (d *ActivityDispatcher) SendCreateNote(note *db.Note) error {
 	}
 
 	actorURI := "https://" + note.Host + "/profile"
-	apNote := map[string]interface{}{
-		"@context":     "https://www.w3.org/ns/activitystreams",
-		"id":           note.URI,
-		"type":         "Note",
-		"published":    note.CreateTime.Format("2006-01-02T15:04:05Z"),
-		"attributedTo": actorURI,
-		"content":      note.Content,
-		"to":           []string{"https://www.w3.org/ns/activitystreams#Public"},
-	}
+	apNote := GenerateAPNote(note)
 
 	activity := map[string]interface{}{
 		"@context": "https://www.w3.org/ns/activitystreams",
@@ -56,11 +48,6 @@ func (d *ActivityDispatcher) SendCreateNote(note *db.Note) error {
 		"object":   apNote,
 	}
 
-	if note.Cw != "" { 
-		activity["sensitive"] = true
-		activity["summary"] = note.Cw
-	}
-	
 	activityBytes, err := json.Marshal(activity)
 	if err != nil {
 		log.Printf("failed to marshal activity: %v", err)
