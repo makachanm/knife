@@ -49,17 +49,18 @@ func (d *ActivityDispatcher) SendCreateNote(note *db.Note) error {
 		"to":           []string{"https://www.w3.org/ns/activitystreams#Public"},
 	}
 
-	if note.Cw != "" { 
-		apNote["sensitive"] = true
-		apNote["summary"] = note.Cw
-	}
-
 	activity := map[string]interface{}{
 		"@context": "https://www.w3.org/ns/activitystreams",
 		"type":     "Create",
 		"actor":    actorURI,
 		"object":   apNote,
 	}
+
+	if note.Cw != "" { 
+		activity["sensitive"] = true
+		activity["summary"] = note.Cw
+	}
+	
 	activityBytes, err := json.Marshal(activity)
 	if err != nil {
 		log.Printf("failed to marshal activity: %v", err)

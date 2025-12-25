@@ -189,6 +189,11 @@ func (a *ActivityPubAPI) Note(w http.ResponseWriter, r *http.Request) {
 		"cc":           cc,
 	}
 
+	if note.Cw != "" { 
+		apNote["sensitive"] = true
+		apNote["summary"] = note.Cw
+	}
+
 	w.Header().Set("Content-Type", "application/activity+json; charset=utf-8")
 	json.NewEncoder(w).Encode(apNote)
 }
