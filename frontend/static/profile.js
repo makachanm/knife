@@ -52,8 +52,65 @@ document.addEventListener('DOMContentLoaded', () => {
         recentPostsContainer.innerHTML = '';
         notes.forEach(note => {
             const noteElement = NoteRenderer.createNoteElement(note);
+            
+            // Add action buttons
+            const actionsDiv = noteElement.querySelector('.note-actions');
+            if (actionsDiv) {
+                actionsDiv.innerHTML = `
+                    <button class='bookmark-button' data-note-id='${note.id}'>Bookmark</button>
+                    <button class='delete-button'>Delete</button>
+                `;
+            }
+
             recentPostsContainer.appendChild(noteElement);
         });
+    }
+
+    recentPostsContainer.addEventListener('click', (e) => {
+        if (e.target.classList.contains('delete-button')) {
+            const noteElement = e.target.closest('.note');
+            const noteId = noteElement.dataset.noteId;
+            if (confirm('Are you sure you want to delete this note?')) {
+                deleteNote(noteId);
+            }
+        }
+        if (e.target.classList.contains('bookmark-button')) {
+            const noteElement = e.target.closest('.note');
+            const noteId = noteElement.dataset.noteId;
+            bookmarkNote(noteId);
+        }
+    });
+
+    async function deleteNote(id) {
+        try {
+            const response = await fetch(`/api/notes/${id}`, { method: 'DELETE' });
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.description || 'Failed to delete note');
+            }
+            fetchNotes();
+        } catch (error) {
+            alert(`Error deleting note: ${error.message}`);
+            console.error('Failed to delete note:', error);
+        }
+    }
+
+    async function bookmarkNote(id) {
+        try {
+            const response = await fetch(`/api/bookmarks`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ note_id: id })
+            });
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.description || 'Failed to bookmark note');
+            }
+            alert('Note bookmarked!');
+        } catch (error) {
+            alert(`Error bookmarking note: ${error.message}`);
+            console.error('Failed to bookmark note:', error);
+        }
     }
 
     function escapeHTML(str) {
