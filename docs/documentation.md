@@ -55,7 +55,7 @@ It is built with **Go** and uses **SQLite** for data storage, making it easy to 
     ```
     Follow the prompts to set up your username, password, and profile details.
 
-4.  Generate keys (optional, usually handled by setup/run):
+4.  Generate keys (first run):
     ```bash
     ./knife initkey
     ```
