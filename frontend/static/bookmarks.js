@@ -16,12 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             notes.forEach((note) => {
-                const noteElement = document.createElement('div');
-                noteElement.className = 'note';
-                noteElement.innerHTML = `
-                    <p>${note.content}</p>
-                    <p class="note-meta">By ${note.author} on ${new Date(note.created).toLocaleDateString()}</p>
-                `;
+                const noteElement = NoteRenderer.createNoteElement(note);
                 notesContainer.appendChild(noteElement);
             });
         })

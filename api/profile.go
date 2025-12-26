@@ -74,6 +74,7 @@ func (a *ProfileAPI) getRecentNotes(ctx base.APIContext) {
 			AuthorFinger: note.AuthorFinger,
 			PublicRange:  note.PublicRange,
 			CreateTime:   note.CreateTime,
+			Category:     note.Category,
 		})
 	}
 

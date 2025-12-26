@@ -37,34 +37,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderNote(note) {
-        const createTime = new Date(note.create_time).toLocaleString();
+        const noteElement = NoteRenderer.createNoteElement(note);
+        
+        // Add action buttons specifically for the single note view
+        const actionsDiv = noteElement.querySelector('.note-actions');
+        if (actionsDiv) {
+            actionsDiv.innerHTML = `
+                <button class='bookmark-button' data-note-id='${note.id}'>Bookmark</button>
+                <button class='delete-button'>Delete</button>
+            `;
+        }
 
-        noteContainer.innerHTML = `
-            <div class="note" data-note-id="${note.id}">
-                <div class='note-header'>
-                    <div>
-                        <span class='author'>${escapeHTML(note.author_name)}</span>
-                        <span class='finger'>@${escapeHTML(note.author_finger)}</span>
-                    </div>
-                </div>
-                ${note.cw ? `<div class='note-cw'>CW: ${escapeHTML(note.cw)}</div>` : ''}
-                <div class='note-content'>${note.content}</div>
-                <div class='note-meta'>
-                    <span>Posted on ${createTime}</span>
-                    ${note.category ? `<br /><span>Category: ${escapeHTML(note.category)}</span>` : ''}
-                    <br />
-                    <span class='public-range'>${publicRanges[note.public_range] || 'Unknown'}</span>
-                    <br />
-                    <span>Host: ${escapeHTML(note.host)}</span>
-                    <br />
-                    <span>URI: <a href="${escapeHTML(note.uri)}">${escapeHTML(note.uri)}</a></span>
-                </div>
-                <div class='note-actions'>
-                    <button class='bookmark-button' data-note-id='${note.id}'>Bookmark</button>
-                    <button class='delete-button'>Delete</button>
-                </div>
-            </div>
-        `;
+        noteContainer.innerHTML = '';
+        noteContainer.appendChild(noteElement);
     }
 
     noteContainer.addEventListener('click', (e) => {

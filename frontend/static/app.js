@@ -32,31 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         timeline.innerHTML = '';
         notes.forEach(note => {
-            const noteElement = document.createElement('div');
-            noteElement.className = 'note';
-            noteElement.dataset.noteId = note.id;
-
-            const createTime = new Date(note.create_time).toLocaleString();
-
-            noteElement.innerHTML = `
-                <div class='note-header'>
-                    <div>
-                        <span class='author'>${escapeHTML(note.author_name)}</span>
-                        <span class='finger'>@${escapeHTML(note.author_finger)}</span>
-                    </div>
-                </div>
-                <hr />
-                <div class='note-content'></div>
-                <div class='note-meta'>
-                    <a href='/notes/${note.id}' class='note-link-time'>Posted on ${createTime}</a>
-                    ${note.category ? `<span> | Category: ${escapeHTML(note.category)}</span>` : ''}
-                </div>
-            `;
-
-            // Insert HTML content into the note-content div
-            const noteContentDiv = noteElement.querySelector('.note-content');
-            noteContentDiv.innerHTML = note.content; // Directly insert HTML content
-
+            const noteElement = NoteRenderer.createNoteElement(note);
             timeline.appendChild(noteElement);
         });
     }

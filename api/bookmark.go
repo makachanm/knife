@@ -70,18 +70,24 @@ func (a *BookmarkAPI) listBookmarks(ctx base.APIContext) {
 	}
 
 	// Fetch note details for each bookmark
-	notes := make([]map[string]interface{}, 0)
+	notes := make([]NoteResponse, 0)
 	for _, bookmark := range bookmarks {
 		note, err := a.NoteModel.Get(bookmark.NoteID)
 		if err != nil {
 			ctx.ReturnError("server_error", "Failed to fetch note details", 500)
 			return
 		}
-		notes = append(notes, map[string]interface{}{
-			"note_id": note.ID,
-			"content": note.Content,
-			"author":  note.AuthorName,
-			"created": note.CreateTime,
+		notes = append(notes, NoteResponse{
+			ID:           note.ID,
+			URI:          note.URI,
+			Cw:           note.Cw,
+			Content:      note.Content,
+			Host:         note.Host,
+			AuthorName:   note.AuthorName,
+			AuthorFinger: note.AuthorFinger,
+			PublicRange:  note.PublicRange,
+			CreateTime:   note.CreateTime,
+			Category:     note.Category,
 		})
 	}
 
