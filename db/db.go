@@ -44,6 +44,7 @@ func InitDB(dataSourceName string) (*DB, error) {
 	// Migration: Add category column to notes if it doesn't exist
 	// We ignore the error because it likely means the column already exists
 	db.Exec("ALTER TABLE notes ADD COLUMN category TEXT DEFAULT ''")
+	db.Exec("ALTER TABLE notes DROP COLUMN medias;")
 
 	return &DB{db}, nil
 }
