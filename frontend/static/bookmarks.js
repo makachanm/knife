@@ -16,19 +16,36 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function renderBookmarks(notes) {
+    async function fetchLogined() { 
+        try {
+            const resp = await fetch(`/api/auth/status`);
+            if (!resp.ok) { 
+                return false;
+            }
+
+            const data = await resp.json();
+            return data.logged_in;
+        } catch(e) { 
+            return false;
+        }
+    }
+
+    async function renderBookmarks(notes) {
         if (!notes || notes.length === 0) {
             notesContainer.innerHTML = '<p>No bookmarks found.</p>';
             return;
         }
 
         notesContainer.innerHTML = '';
-        notes.forEach((note) => {
+        const isLoggedIn = await fetchLogined();
+
+        for (const note of notes) {
             const noteElement = NoteRenderer.createNoteElement(note);
             
             // Add "Remove Bookmark" button
             const actionsDiv = noteElement.querySelector('.note-actions');
-            if (actionsDiv) {
+            
+            if (actionsDiv && isLoggedIn) {
                 const removeBtn = document.createElement('button');
                 removeBtn.textContent = 'Remove Bookmark';
                 removeBtn.className = 'delete-button'; // Re-using delete style for now, or could use bookmark style
@@ -38,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             notesContainer.appendChild(noteElement);
-        });
+        }
     }
 
     async function removeBookmark(noteId) {

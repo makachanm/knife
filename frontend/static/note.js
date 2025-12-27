@@ -36,12 +36,27 @@ document.addEventListener('DOMContentLoaded', () => {
             });
     }
 
-    function renderNote(note) {
+    async function fetchLogined() { 
+        try {
+            const resp = await fetch(`/api/auth/status`);
+            if (!resp.ok) { 
+                return false;
+            }
+
+            const data = await resp.json();
+            return data.logged_in;
+        } catch(e) { 
+            return false;
+        }
+    }
+
+    async function renderNote(note) {
         const noteElement = NoteRenderer.createNoteElement(note);
         
         // Add action buttons specifically for the single note view
         const actionsDiv = noteElement.querySelector('.note-actions');
-        if (actionsDiv) {
+        const isLoggedIn = await fetchLogined();
+        if (actionsDiv && isLoggedIn) {
             actionsDiv.innerHTML = `
                 <button class='bookmark-button' data-note-id='${note.id}'>Bookmark</button>
                 <button class='delete-button'>Delete</button>

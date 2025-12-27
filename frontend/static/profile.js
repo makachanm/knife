@@ -23,6 +23,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function fetchLogined() { 
+        try {
+            const resp = await fetch(`/api/auth/status`);
+            if (!resp.ok) { 
+                return false;
+            }
+
+            const data = await resp.json();
+            return data.logged_in;
+        } catch(e) { 
+            return false;
+        }
+    }
+
     function renderProfile(profile) {
         document.getElementById('profile-name-header').textContent = profile.display_name || 'Your Name';
         document.getElementById('profile-finger').textContent = profile.finger || '@yourhandle';
@@ -43,19 +57,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function renderNotes(notes) {
+    async function renderNotes(notes) {
         if (!notes || notes.length === 0) {
             recentPostsContainer.innerHTML = '<p>No notes yet.</p>';
             return;
         }
 
         recentPostsContainer.innerHTML = '';
-        notes.forEach(note => {
+        const isLoggedIn = await fetchLogined();
+        
+        for (const note of notes) {
             const noteElement = NoteRenderer.createNoteElement(note);
             
             // Add action buttons
             const actionsDiv = noteElement.querySelector('.note-actions');
-            if (actionsDiv) {
+            if (actionsDiv && isLoggedIn) {
                 actionsDiv.innerHTML = `
                     <button class='bookmark-button' data-note-id='${note.id}'>Bookmark</button>
                     <button class='delete-button'>Delete</button>
@@ -63,7 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             recentPostsContainer.appendChild(noteElement);
-        });
+        }
     }
 
     recentPostsContainer.addEventListener('click', (e) => {

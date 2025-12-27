@@ -74,7 +74,7 @@ body {
 }
 
 /* Notes */
-.timeline-list, .notes-list, .recent-posts {
+.recent-posts, #recent-posts-container {
     display: flex;
     flex-direction: column;
     gap: 2rem;
