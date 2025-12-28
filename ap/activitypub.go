@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -441,6 +442,10 @@ func (a *ActivityPubAPI) extractHost(urlStr string) string {
 
 // fetchActor fetches an ActivityPub Actor from the given IRI.
 func fetchActor(iri string) (*activitypub.Actor, error) {
+	if err := validateIRI(iri); err != nil {
+		return nil, fmt.Errorf("fetchActor: invalid IRI: %w", err)
+	}
+
 	// Create a GET request to fetch the actor
 	req, err := http.NewRequest("GET", iri, nil)
 	if err != nil {
@@ -479,5 +484,30 @@ func fetchActor(iri string) (*activitypub.Actor, error) {
 	}
 
 	return actor, nil
+}
+
+func validateIRI(iri string) error {
+	u, err := url.Parse(iri)
+	if err != nil {
+		return err
+	}
+
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("unsupported scheme: %s", u.Scheme)
+	}
+
+	hostname := u.Hostname()
+	ips, err := net.LookupIP(hostname)
+	if err != nil {
+		return err
+	}
+
+	for _, ip := range ips {
+		if ip.IsLoopback() || ip.IsPrivate() || ip.IsUnspecified() {
+			return fmt.Errorf("resolves to private/loopback IP: %s", ip.String())
+		}
+	}
+
+	return nil
 }
 

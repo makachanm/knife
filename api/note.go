@@ -12,6 +12,7 @@ import (
 	"knife/db"
 
 	"github.com/gomarkdown/markdown"
+	"github.com/microcosm-cc/bluemonday"
 )
 
 type NoteAPI struct {
@@ -88,7 +89,8 @@ func (a *NoteAPI) createNote(ctx base.APIContext) {
 	note.Host = ctx.GetHost()
 	note.AuthorName = profile.DisplayName
 	note.AuthorFinger = profile.Finger
-	note.Content = string(markdown.ToHTML([]byte(note.Content), nil, nil))
+	unsafeHTML := markdown.ToHTML([]byte(note.Content), nil, nil)
+	note.Content = string(bluemonday.UGCPolicy().SanitizeBytes(unsafeHTML))
 	if err := a.noteModel.CreateLocalNote(&note); err != nil {
 		ctx.ReturnError("dberror", err.Error(), http.StatusInternalServerError)
 		return

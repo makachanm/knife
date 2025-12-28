@@ -9,7 +9,12 @@ require (
 	golang.org/x/crypto v0.46.0
 )
 
-require golang.org/x/sys v0.39.0 // indirect
+require (
+	github.com/aymerick/douceur v0.2.0 // indirect
+	github.com/gorilla/css v1.0.1 // indirect
+	github.com/microcosm-cc/bluemonday v1.0.27 // indirect
+	golang.org/x/sys v0.39.0 // indirect
+)
 
 require (
 	git.sr.ht/~mariusor/go-xsd-duration v0.0.0-20220703122237-02e73435a078 // indirect
