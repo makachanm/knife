@@ -278,6 +278,10 @@ func (a *ActivityPubAPI) Inbox(w http.ResponseWriter, r *http.Request) {
 			return a.handleUpdateActivity(act)
 		case activitypub.DeleteType:
 			return a.handleDeleteActivity(act)
+		case activitypub.LikeType:
+			return a.handleLikeActivity(act)
+		case activitypub.AnnounceType:
+			return a.handleAnnounceActivity(act)
 		default:
 			log.Printf("Inbox: unsupported activity type %s", act.GetType())
 			return nil
@@ -324,8 +328,12 @@ func (a *ActivityPubAPI) handleFollowActivity(act *activitypub.Activity, host st
 
 // handleUndoActivity processes Undo activities.
 func (a *ActivityPubAPI) handleUndoActivity(act *activitypub.Activity) error {
-	return activitypub.OnObject(act.Object, func(object *activitypub.Object) error {
-		if object.GetType() == activitypub.FollowType {
+	// The object of an Undo activity is the Activity being undone.
+	return activitypub.OnActivity(act.Object, func(innerAct *activitypub.Activity) error {
+		switch innerAct.GetType() {
+		case activitypub.FollowType:
+			// For Undo Follow, we need the actor of the *Undo* activity (the person unfollowing)
+			// But wait, existing logic used act.Actor.
 			actor, err := a.resolveActor(act.Actor)
 			if err != nil {
 				return fmt.Errorf("handleUndoActivity: %w", err)
@@ -333,9 +341,70 @@ func (a *ActivityPubAPI) handleUndoActivity(act *activitypub.Activity) error {
 
 			log.Printf("Inbox: Removing follower %s", actor.GetID())
 			return a.followerModel.RemoveFollower(actor.GetID().String())
+
+		case activitypub.LikeType:
+			return a.handleUndoLike(innerAct)
+
+		case activitypub.AnnounceType:
+			return a.handleUndoAnnounce(innerAct)
 		}
 		return nil
 	})
+}
+
+func (a *ActivityPubAPI) handleUndoLike(innerAct *activitypub.Activity) error {
+	var uri string
+	if innerAct.Object.IsLink() {
+		uri = innerAct.Object.GetLink().String()
+	} else {
+		// If it's an object, we need to extract ID
+		// innerAct.Object is Item (interface)
+		// We can't access First() directly on Item if it's not a collection?
+		// Actually innerAct.Object is Item, IsLink works.
+		// To get ID if it's not a link, we need to cast or use GetID().
+		if innerAct.Object != nil {
+			uri = innerAct.Object.GetID().String()
+		}
+	}
+
+	if uri == "" {
+		log.Printf("Inbox: Could not determine Note URI for Undo Like")
+		return nil
+	}
+
+	note, err := a.noteModel.GetByURI(uri)
+	if err != nil {
+		log.Printf("Inbox: Note %s not found for Undo Like", uri)
+		return nil
+	}
+
+	log.Printf("Inbox: Decrementing likes for note %s", uri)
+	return a.noteModel.DecrementLikes(note.ID)
+}
+
+func (a *ActivityPubAPI) handleUndoAnnounce(innerAct *activitypub.Activity) error {
+	var uri string
+	if innerAct.Object.IsLink() {
+		uri = innerAct.Object.GetLink().String()
+	} else {
+		if innerAct.Object != nil {
+			uri = innerAct.Object.GetID().String()
+		}
+	}
+
+	if uri == "" {
+		log.Printf("Inbox: Could not determine Note URI for Undo Announce")
+		return nil
+	}
+
+	note, err := a.noteModel.GetByURI(uri)
+	if err != nil {
+		log.Printf("Inbox: Note %s not found for Undo Announce", uri)
+		return nil
+	}
+
+	log.Printf("Inbox: Decrementing shares for note %s", uri)
+	return a.noteModel.DecrementShares(note.ID)
 }
 
 // handleCreateActivity processes Create activities.
@@ -395,10 +464,24 @@ func (a *ActivityPubAPI) handleUpdateActivity(act *activitypub.Activity) error {
 
 // handleDeleteActivity processes Delete activities.
 func (a *ActivityPubAPI) handleDeleteActivity(act *activitypub.Activity) error {
-	return activitypub.OnObject(act.Object, func(obj *activitypub.Object) error {
-		log.Printf("Inbox: Deleting federated object %s", obj.GetID())
-		return a.noteModel.DeleteByURI(obj.GetID().String())
-	})
+	var uri string
+	if act.Object.IsLink() {
+		uri = act.Object.GetLink().String()
+	} else {
+		err := activitypub.OnObject(act.Object, func(obj *activitypub.Object) error {
+			uri = obj.GetID().String()
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	if uri != "" {
+		log.Printf("Inbox: Deleting federated object %s", uri)
+		return a.noteModel.DeleteByURI(uri)
+	}
+	return nil
 }
 
 // resolveActorAndInbox resolves an actor and their inbox URI.
@@ -511,3 +594,56 @@ func validateIRI(iri string) error {
 	return nil
 }
 
+func (a *ActivityPubAPI) handleLikeActivity(act *activitypub.Activity) error {
+	var uri string
+	if act.Object.IsLink() {
+		uri = act.Object.GetLink().String()
+	} else {
+		err := activitypub.OnObject(act.Object, func(object *activitypub.Object) error {
+			uri = object.GetID().String()
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	if uri == "" {
+		return fmt.Errorf("could not determine object URI for Like")
+	}
+
+	note, err := a.noteModel.GetByURI(uri)
+	if err != nil {
+		log.Printf("Inbox: Note %s not found for Like", uri)
+		return nil
+	}
+	log.Printf("Inbox: Incrementing likes for note %s", uri)
+	return a.noteModel.IncrementLikes(note.ID)
+}
+
+func (a *ActivityPubAPI) handleAnnounceActivity(act *activitypub.Activity) error {
+	var uri string
+	if act.Object.IsLink() {
+		uri = act.Object.GetLink().String()
+	} else {
+		err := activitypub.OnObject(act.Object, func(object *activitypub.Object) error {
+			uri = object.GetID().String()
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	if uri == "" {
+		return fmt.Errorf("could not determine object URI for Announce")
+	}
+
+	note, err := a.noteModel.GetByURI(uri)
+	if err != nil {
+		log.Printf("Inbox: Note %s not found for Announce", uri)
+		return nil
+	}
+	log.Printf("Inbox: Incrementing shares for note %s", uri)
+	return a.noteModel.IncrementShares(note.ID)
+}

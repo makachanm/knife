@@ -76,6 +76,8 @@ function createNoteElement(note) {
             <span class='public-range'>${publicRanges[note.public_range] || 'Unknown'}</span>
             <br />
             <span>Host: ${escapeHTML(note.host)}</span>
+            ${note.likes > 0 ? `<span> | ${note.likes} Likes</span>` : ''}
+            ${note.shares > 0 ? `<span> | ${note.shares} Shares</span>` : ''}
         </div>
         <div class='note-actions'>
              <!-- Actions can be customized or hidden via CSS if needed, but included for consistency -->

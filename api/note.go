@@ -37,6 +37,8 @@ type NoteResponse struct {
 	PublicRange  db.NotePublicRange `json:"public_range,string"`
 	CreateTime   time.Time          `json:"create_time"`
 	Category     string             `json:"category,omitempty"`
+	Likes        int                `json:"likes"`
+	Shares       int                `json:"shares"` 
 }
 
 // RegisterHandlers registers the API handlers for notes.
@@ -67,6 +69,8 @@ func (a *NoteAPI) listNotes(ctx base.APIContext) {
 			PublicRange:  note.PublicRange,
 			CreateTime:   note.CreateTime,
 			Category:     note.Category,
+			Likes:        int(note.Likes),
+			Shares:       int(note.Shares),
 		})
 	}
 
@@ -134,6 +138,8 @@ func (a *NoteAPI) getNote(ctx base.APIContext) {
 		PublicRange:  note.PublicRange,
 		CreateTime:   note.CreateTime,
 		Category:     note.Category,
+		Likes:        int(note.Likes),
+		Shares:       int(note.Shares),
 	}
 
 	ctx.ReturnJSON(response)

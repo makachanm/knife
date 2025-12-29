@@ -25,6 +25,8 @@ type Note struct {
 	PublicRange  NotePublicRange `db:"public_range" json:"public_range,string"`
 	CreateTime   time.Time       `db:"create_time" json:"create_time"`
 	Category     string          `db:"category" json:"category,omitempty"`
+	Likes        int64           `db:"likes" json:"likes"`
+	Shares       int64           `db:"shares" json:"shares"`
 }
 
 type NoteModel struct {
@@ -38,8 +40,8 @@ func NewNoteModel(db *DB) *NoteModel {
 // CreateFederatedNote creates a note that already has a URI (e.g., from ActivityPub).
 func (m *NoteModel) CreateFederatedNote(note *Note) error {
 	query := `
-		INSERT INTO notes (uri, cw, content, host, author_name, public_range, author_finger, category)
-		VALUES (:uri, :cw, :content, :host, :author_name, :public_range, :author_finger, :category)
+		INSERT INTO notes (uri, cw, content, host, author_name, public_range, author_finger, category, likes, shares)
+		VALUES (:uri, :cw, :content, :host, :author_name, :public_range, :author_finger, :category, :likes, :shares)
 	`
 
 	_, err := m.DB.NamedExec(query, note)
@@ -61,8 +63,8 @@ func (m *NoteModel) CreateLocalNote(note *Note) error {
 
 	// Insert the note without the URI
 	query := `
-		INSERT INTO notes (cw, content, host, author_name, public_range, author_finger, category)
-		VALUES (:cw, :content, :host, :author_name, :public_range, :author_finger, :category)
+		INSERT INTO notes (cw, content, host, author_name, public_range, author_finger, category, likes, shares)
+		VALUES (:cw, :content, :host, :author_name, :public_range, :author_finger, :category, 0, 0)
 	`
 	result, err := tx.NamedExec(query, note)
 	if err != nil {
@@ -88,8 +90,15 @@ func (m *NoteModel) CreateLocalNote(note *Note) error {
 
 func (m *NoteModel) Get(id int64) (*Note, error) {
 	var note Note
-	query := "SELECT id, uri, cw, content, host, author_name, author_finger, public_range, create_time, category FROM notes WHERE id = ?"
+	query := "SELECT id, uri, cw, content, host, author_name, author_finger, public_range, create_time, category, likes, shares FROM notes WHERE id = ?"
 	err := m.DB.Get(&note, query, id)
+	return &note, err
+}
+
+func (m *NoteModel) GetByURI(uri string) (*Note, error) {
+	var note Note
+	query := "SELECT id, uri, cw, content, host, author_name, author_finger, public_range, create_time, category, likes, shares FROM notes WHERE uri = ?"
+	err := m.DB.Get(&note, query, uri)
 	return &note, err
 }
 
@@ -124,7 +133,7 @@ func (m *NoteModel) DeleteByURI(uri string) error {
 
 func (m *NoteModel) ListRecent() ([]Note, error) {
 	var notes []Note
-	query := "SELECT id, uri, cw, content, host, author_name, author_finger, public_range, create_time, category FROM notes ORDER BY create_time DESC LIMIT 100"
+	query := "SELECT id, uri, cw, content, host, author_name, author_finger, public_range, create_time, category, likes, shares FROM notes ORDER BY create_time DESC LIMIT 100"
 	err := m.DB.Select(&notes, query)
 	return notes, err
 }
@@ -139,7 +148,7 @@ func (m *NoteModel) ListByMyRecent() ([]Note, error) {
 		return nil, err
 	}
 
-	query := "SELECT id, uri, cw, content, host, author_name, author_finger, public_range, create_time, category FROM notes WHERE author_finger = ? ORDER BY create_time DESC LIMIT 100"
+	query := "SELECT id, uri, cw, content, host, author_name, author_finger, public_range, create_time, category, likes, shares FROM notes WHERE author_finger = ? ORDER BY create_time DESC LIMIT 100"
 	err = m.DB.Select(&notes, query, myFinger)
 	return notes, err
 }
@@ -153,7 +162,31 @@ func (m *NoteModel) ListCategories() ([]string, error) {
 
 func (m *NoteModel) ListByCategory(category string) ([]Note, error) {
 	var notes []Note
-	query := "SELECT id, uri, cw, content, host, author_name, author_finger, public_range, create_time, category FROM notes WHERE category = ? ORDER BY create_time DESC LIMIT 100"
+	query := "SELECT id, uri, cw, content, host, author_name, author_finger, public_range, create_time, category, likes, shares FROM notes WHERE category = ? ORDER BY create_time DESC LIMIT 100"
 	err := m.DB.Select(&notes, query, category)
 	return notes, err
+}
+
+func (m *NoteModel) IncrementLikes(id int64) error {
+	query := "UPDATE notes SET likes = likes + 1 WHERE id = ?"
+	_, err := m.DB.Exec(query, id)
+	return err
+}
+
+func (m *NoteModel) DecrementLikes(id int64) error {
+	query := "UPDATE notes SET likes = MAX(0, likes - 1) WHERE id = ?"
+	_, err := m.DB.Exec(query, id)
+	return err
+}
+
+func (m *NoteModel) IncrementShares(id int64) error {
+	query := "UPDATE notes SET shares = shares + 1 WHERE id = ?"
+	_, err := m.DB.Exec(query, id)
+	return err
+}
+
+func (m *NoteModel) DecrementShares(id int64) error {
+	query := "UPDATE notes SET shares = MAX(0, shares - 1) WHERE id = ?"
+	_, err := m.DB.Exec(query, id)
+	return err
 }
