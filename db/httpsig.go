@@ -62,7 +62,7 @@ func (m *HTTPSigModel) Create(actor string) (*HTTPSig, error) {
 	}
 
 	query := `
-		INSERT INTO httpsigs (actor, public_key, private_key)
+		INSERT OR REPLACE INTO httpsigs (actor, public_key, private_key)
 		VALUES (:actor, :public_key, :private_key)
 	`
 	result, err := m.DB.NamedExec(query, sig)

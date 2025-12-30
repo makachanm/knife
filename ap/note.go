@@ -9,15 +9,15 @@ import (
 )
 
 // GenerateAPNote constructs a map representing an ActivityPub Note object.
-func GenerateAPNote(note *db.Note) map[string]interface{} {
-	to, cc := GetVisibilityTargets(note)
+func GenerateAPNote(note *db.Note, baseURL string) map[string]interface{} {
+	to, cc := GetVisibilityTargets(note, baseURL)
 
 	apNote := map[string]interface{}{
 		"@context":     "https://www.w3.org/ns/activitystreams",
 		"id":           note.URI,
 		"type":         "Note",
 		"published":    note.CreateTime.Format("2006-01-02T15:04:05Z"),
-		"attributedTo": "https://" + note.Host + "/profile",
+		"attributedTo": baseURL + "/profile",
 		"content":      note.Content,
 		"to":           to,
 		"cc":           cc,
@@ -32,7 +32,7 @@ func GenerateAPNote(note *db.Note) map[string]interface{} {
 }
 
 // GetVisibilityTargets determines the "to" and "cc" fields based on the note's visibility.
-func GetVisibilityTargets(note *db.Note) ([]string, []string) {
+func GetVisibilityTargets(note *db.Note, baseURL string) ([]string, []string) {
 	var to []string
 	var cc []string
 
@@ -41,15 +41,15 @@ func GetVisibilityTargets(note *db.Note) ([]string, []string) {
 		to = []string{"https://www.w3.org/ns/activitystreams#Public"}
 	case db.NotePublicRangeFollowers:
 		to = []string{}
-		cc = []string{"https://" + note.Host + "/followers"}
+		cc = []string{baseURL + "/followers"}
 	case db.NotePublicRangeUnlisted:
 		to = []string{}
 		cc = []string{"https://www.w3.org/ns/activitystreams#Public"}
 	case db.NotePublicRangePrivate:
-		to = []string{"https://" + note.Host + "/profile"}
+		to = []string{baseURL + "/profile"}
 	default:
 		// Default to private if the range is unknown
-		to = []string{"https://" + note.Host + "/profile"}
+		to = []string{baseURL + "/profile"}
 	}
 
 	return to, cc

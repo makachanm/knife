@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -24,6 +25,13 @@ type NoteAPI struct {
 
 func NewNoteAPI(noteModel *db.NoteModel, profileModel *db.ProfileModel, followerModel *db.FollowerModel, dispatcher *ap.ActivityDispatcher) *NoteAPI {
 	return &NoteAPI{noteModel: noteModel, profileModel: profileModel, followerModel: followerModel, dispatcher: dispatcher}
+}
+
+func (a *NoteAPI) getHost(fallback string) string {
+	if host := os.Getenv("KNIFE_HOST"); host != "" {
+		return host
+	}
+	return fallback
 }
 
 type NoteResponse struct {
@@ -90,7 +98,7 @@ func (a *NoteAPI) createNote(ctx base.APIContext) {
 		return
 	}
 
-	note.Host = ctx.GetHost()
+	note.Host = a.getHost(ctx.GetHost())
 	note.AuthorName = profile.DisplayName
 	note.AuthorFinger = profile.Finger
 	unsafeHTML := markdown.ToHTML([]byte(note.Content), nil, nil)

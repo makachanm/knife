@@ -85,6 +85,11 @@ func (m *NoteModel) CreateLocalNote(note *Note) error {
 		return err
 	}
 
+	// Retrieve the create_time that was set by the database
+	if err := tx.QueryRow("SELECT create_time FROM notes WHERE id = ?", note.ID).Scan(&note.CreateTime); err != nil {
+		return err
+	}
+
 	return tx.Commit()
 }
 

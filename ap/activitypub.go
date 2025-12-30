@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 
 	// For knife.Version
@@ -35,40 +36,67 @@ func NewActivityPubAPI(noteModel *db.NoteModel, profileModel *db.ProfileModel, f
 	return &ActivityPubAPI{noteModel: noteModel, profileModel: profileModel, followerModel: followerModel, httpsigModel: httpsigModel}
 }
 
+func (a *ActivityPubAPI) getProtocol() string {
+	if proto := os.Getenv("KNIFE_PROTOCOL"); proto != "" {
+		return proto
+	}
+	return "https"
+}
+
+func (a *ActivityPubAPI) getHost(r *http.Request) string {
+	if host := os.Getenv("KNIFE_HOST"); host != "" {
+		return host
+	}
+	return r.Host
+}
+
+func (a *ActivityPubAPI) getBaseURL(r *http.Request) string {
+	return fmt.Sprintf("%s://%s", a.getProtocol(), a.getHost(r))
+}
+
 // Webfinger handles /.well-known/webfinger requests
 func (a *ActivityPubAPI) Webfinger(w http.ResponseWriter, r *http.Request) {
 	resource := r.URL.Query().Get("resource")
+	log.Printf("Webfinger request for resource: %s", resource)
+
 	if resource == "" {
 		http.Error(w, "missing resource", http.StatusBadRequest)
 		return
 	}
+
 	profile, err := a.profileModel.Get()
 	if err != nil {
+		log.Printf("Webfinger: profile lookup failed: %v", err)
 		http.Error(w, "profile not found", http.StatusNotFound)
 		return
 	}
 
-	host := r.Host
-	id := "https://" + host + "/profile"
+	host := a.getHost(r)
+	canonicalSubject := fmt.Sprintf("acct:%s@%s", profile.Finger, host)
+	id := a.getBaseURL(r) + "/profile"
 
-	actor := map[string]interface{}{
-		"@context":          "https://www.w3.org/ns/activitystreams",
-		"id":                id,
-		"type":              "Person",
-		"preferredUsername": profile.Finger,
-		"name":              profile.DisplayName,
-		"summary":           profile.Bio,
-		"inbox":             "https://" + host + "/inbox",
-		"outbox":            "https://" + host + "/outbox", // Placeholder
-		"icon": map[string]interface{}{
-			"type":      "Image",
-			"mediaType": "image/png", // Assuming png, could be dynamic
-			"url":       profile.AvatarURL,
+	jrd := map[string]interface{}{
+		"subject": canonicalSubject,
+		"aliases": []string{id},
+		"links": []map[string]interface{}{
+			{
+				"rel":  "self",
+				"type": "application/activity+json",
+				"href": id,
+			},
+			{
+				"rel":  "http://webfinger.net/rel/profile-page",
+				"type": "text/html",
+				"href": id,
+			},
 		},
 	}
 
 	w.Header().Set("Content-Type", "application/jrd+json")
-	json.NewEncoder(w).Encode(actor)
+	if err := json.NewEncoder(w).Encode(jrd); err != nil {
+		log.Printf("Webfinger: failed to encode response: %v", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+	}
 }
 
 // Actor serves the site's actor profile.
@@ -79,8 +107,7 @@ func (a *ActivityPubAPI) Actor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	host := r.Host
-	id := "https://" + host + "/profile"
+	id := a.getBaseURL(r) + "/profile"
 
 	sig, err := a.httpsigModel.GetByActor(id)
 	if err != nil {
@@ -97,14 +124,20 @@ func (a *ActivityPubAPI) Actor(w http.ResponseWriter, r *http.Request) {
 	}
 
 	actor := map[string]interface{}{
-		"@context":          "https://www.w3.org/ns/activitystreams",
+		"@context": []interface{}{
+			"https://www.w3.org/ns/activitystreams",
+			"https://w3id.org/security/v1",
+		},
 		"id":                id,
 		"type":              "Person",
 		"preferredUsername": profile.Finger,
 		"name":              profile.DisplayName,
 		"summary":           profile.Bio,
-		"inbox":             "https://" + host + "/inbox",
-		"outbox":            "https://" + host + "/outbox",
+		"inbox":             a.getBaseURL(r) + "/inbox",
+		"outbox":            a.getBaseURL(r) + "/outbox",
+		"endpoints": map[string]interface{}{
+			"sharedInbox": a.getBaseURL(r) + "/inbox", // Single user, so shared inbox is same as inbox
+		},
 		"icon": map[string]interface{}{
 			"type":      "Image",
 			"mediaType": "image/png", // Assuming png, could be dynamic
@@ -112,6 +145,7 @@ func (a *ActivityPubAPI) Actor(w http.ResponseWriter, r *http.Request) {
 		},
 		"publicKey": map[string]interface{}{
 			"id":           id + "#main-key",
+			"type":         "Key",
 			"owner":        id,
 			"publicKeyPem": sig.PublicKey,
 		},
@@ -123,6 +157,7 @@ func (a *ActivityPubAPI) Actor(w http.ResponseWriter, r *http.Request) {
 
 // NodeInfoHandler handles /.well-known/nodeinfo requests
 func (a *ActivityPubAPI) NodeInfoHandler(w http.ResponseWriter, r *http.Request) {
+	profileData, _ := a.profileModel.Get()
 	nodeInfo := NodeInfo{
 		Version: "2.1", // Currently preferred NodeInfo version for ActivityPub
 		Software: NodeInfoSoftware{
@@ -145,8 +180,8 @@ func (a *ActivityPubAPI) NodeInfoHandler(w http.ResponseWriter, r *http.Request)
 			},
 		},
 		Metadata: map[string]interface{}{
-			"nodeName":        "knife instance",                                  // Customizable
-			"nodeDescription": "A personal ActivityPub server powered by knife.", // Customizable
+			"nodeName":        "knife",                                  // Customizable
+			"nodeDescription": profileData.Bio, // Customizable
 		},
 	}
 
@@ -172,7 +207,9 @@ func (a *ActivityPubAPI) Note(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	apNote := GenerateAPNote(note)
+	apNote := GenerateAPNote(note, a.getBaseURL(r))
+	// Ensure the ID in the JSON matches the canonical URL
+	apNote["id"] = a.getBaseURL(r) + "/notes/" + idStr
 
 	w.Header().Set("Content-Type", "application/activity+json; charset=utf-8")
 	json.NewEncoder(w).Encode(apNote)
@@ -196,11 +233,7 @@ func (a *ActivityPubAPI) sendActivity(inbox string, actorIRI string, activity in
 	}
 	req.Header.Set("Host", inboxURL.Host)
 
-	profile, err := a.profileModel.Get()
-	if err != nil {
-		return fmt.Errorf("failed to get profile: %w", err)
-	}
-	sig, err := a.httpsigModel.GetByActor(profile.Finger)
+	sig, err := a.httpsigModel.GetByActor(actorIRI)
 	if err != nil {
 		return fmt.Errorf("failed to get httpsig for %s: %w", actorIRI, err)
 	}
@@ -227,6 +260,8 @@ func (a *ActivityPubAPI) sendActivity(inbox string, actorIRI string, activity in
 		return fmt.Errorf("failed to sign request: %w", err)
 	}
 
+	log.Printf("Sending activity to %s. Headers: Digest=%s, Signature=%s", inbox, req.Header.Get("Digest"), req.Header.Get("Signature"))
+
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -236,6 +271,7 @@ func (a *ActivityPubAPI) sendActivity(inbox string, actorIRI string, activity in
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(resp.Body)
+		log.Printf("inbox %s returned status %d: %s", inbox, resp.StatusCode, string(body))
 		return fmt.Errorf("activity send failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
@@ -309,7 +345,9 @@ func (a *ActivityPubAPI) handleFollowActivity(act *activitypub.Activity, host st
 	}
 
 	myActorIRI := "https://" + host + "/profile"
+	acceptID := fmt.Sprintf("https://%s/activities/accept-%d", host, time.Now().UnixNano())
 	accept := activitypub.Accept{
+		ID:     activitypub.IRI(acceptID),
 		Type:   activitypub.AcceptType,
 		Actor:  activitypub.IRI(myActorIRI),
 		Object: act,
@@ -577,6 +615,10 @@ func validateIRI(iri string) error {
 
 	if u.Scheme != "http" && u.Scheme != "https" {
 		return fmt.Errorf("unsupported scheme: %s", u.Scheme)
+	}
+
+	if os.Getenv("KNIFE_DEV_MODE") == "true" {
+		return nil
 	}
 
 	hostname := u.Hostname()
